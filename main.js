@@ -146,46 +146,45 @@ class magikESpeller {
                 //If siyllable est start with C is invalid, we pass the spare syllable to previous pos
                 let syllEst = this.getEst(syllable, "array");
 
-                if (syllEst.length > 2) {
-
-                    let _syllable = syllable.slice(0, syllable.length - 1);
-                    let isValEs = this.isValidSyllablesEst([this.getEstExt(_syllable).join("")], [_syllable]);
-
-                    if (isValEs) return;
-
-                    _syllable.split("").some((s, i) => {
-
-                        let probSyll = _syllable.slice(i + 1, _syllable.length);
-                        if (this.getEst(probSyll) === "C" || this.isValidSyllablesEst([this.getEstExt(probSyll)], [probSyll])) {
-
-                            syllables[syllables.length - 2] = syllables.at(-2) + _syllable.slice(0, i + 1);
-                            syllables[syllables.length - 1] = syllables.at(-1).slice(i + 1, 30)
-                            return true;
-                        }
-
-
-                    })
-
-                }
-                return;
-            }
-            syllablesTmp.push(wordAsArray[index]);
-
-            if (wordAsEstArray[index + 1] === "V" && syllablesTmp.length > 0) {
-
-                let probSyllableStartsWithV = syllables.at(-1) + syllablesTmp.join("");
-
-                // We purge non valid syllabes
-                if (!this.isValid(probSyllableStartsWithV) || this.getEst(probSyllableStartsWithV[0]) === "C")
+                if (syllEst.length <= 2)
                     return;
 
-                let reverseSearchResult = this.reverseSearch(probSyllableStartsWithV, this.syllablesThatStartsWithVowel, true); console.log(reverseSearchResult);
-                // We check if the probable syllable that starts with a vowel exits in array syllablesThatStartsWithVowel
-                // And the result given by reverse Search its valid
-                if (reverseSearchResult !== false && this.getEst(reverseSearchResult, "array")[0] !== "C") {
-                    syllables[syllables.length - 1] = reverseSearchResult;
-                    pointer = syllables.join("").length;
-                }
+                let _syllable = syllable.slice(0, syllable.length - 1);
+                let isValEs = this.isValidSyllablesEst([this.getEstExt(_syllable).join("")], [_syllable]);
+
+                if (isValEs) return;
+
+                _syllable.split("").some((s, i) => {
+
+                    let probSyll = _syllable.slice(i + 1, _syllable.length);
+                    if (this.getEst(probSyll) === "C" || this.isValidSyllablesEst([this.getEstExt(probSyll)], [probSyll])) {
+
+                        syllables[syllables.length - 2] = syllables.at(-2) + _syllable.slice(0, i + 1);
+                        syllables[syllables.length - 1] = syllables.at(-1).slice(i + 1, 30)
+                        return true;
+                    }
+
+                })
+                return;
+            }
+
+            syllablesTmp.push(wordAsArray[index]);
+
+            if (wordAsEstArray[index + 1] === "C" || syllablesTmp.length == 0)
+                return;
+
+            let probSyllableStartsWithV = syllables.at(-1) + syllablesTmp.join("");
+
+            // We purge non valid syllabes
+            if (!this.isValid(probSyllableStartsWithV) || this.getEst(probSyllableStartsWithV[0]) === "C")
+                return;
+
+            let reverseSearchResult = this.reverseSearch(probSyllableStartsWithV, this.syllablesThatStartsWithVowel, true); console.log(reverseSearchResult);
+            // We check if the probable syllable that starts with a vowel exits in array syllablesThatStartsWithVowel
+            // And the result given by reverse Search its valid
+            if (reverseSearchResult !== false && this.getEst(reverseSearchResult, "array")[0] !== "C") {
+                syllables[syllables.length - 1] = reverseSearchResult;
+                pointer = syllables.join("").length;
             }
 
         });
