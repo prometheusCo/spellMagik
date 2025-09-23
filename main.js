@@ -117,7 +117,7 @@ class magikSpeller {
         this.isValidSyllablesEst = this.coreFunctionsExt.isValidSyllablesEst;
     }
 
-    //
+    //  
     //Heuristic syllables spliter
     splitInSyllables(word) {
         console.time("miScript");
