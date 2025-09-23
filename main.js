@@ -23,7 +23,7 @@ class coreFunctions {
         'un'
     ];
 
-    validSyllablesEst = ['COCL', 'CFCL', 'dr', 'dl', 'ph', 'ps'];
+    validSyllablesEst = ['COCL', 'CFCL', 'dr', 'dl', 'ph', 'ps', 'rr'];
 
     constructor() { };
 
@@ -63,8 +63,8 @@ class coreFunctions {
     //
     isValidSyllablesEst(syllablesEstAsArray, syllabesAsArray) {
 
-        return [...syllablesEstAsArray].forEach((est, index) => {
-            if (validSyllablesEst.includes(est) || this.validSyllablesEst.includes(syllabesAsArray[i]))
+        return [...syllablesEstAsArray].some((est, index) => {
+            if (this.validSyllablesEst.includes(est) || this.validSyllablesEst.includes(syllabesAsArray[index]))
                 return true;
             return false;
         })
@@ -91,6 +91,8 @@ class coreFunctionsExt extends coreFunctions {
             if (this.consonantsF.includes(wordAsArray[index])) return "CF";
             if (this.consonantsL.includes(wordAsArray[index])) return "CL";
 
+            return "NN";
+
         });
 
     }
@@ -98,13 +100,17 @@ class coreFunctionsExt extends coreFunctions {
 
 //
 // Main class
-class magikSpeller {
+class magikESpeller {
 
 
     constructor() {
 
         this.coreF = new coreFunctions();
         this.getEst = this.coreF.getEst;
+        this.isValid = this.coreF.isValid;
+        this.reverseSearch = this.coreF.reverseSearch;
+        this.syllablesThatStartsWithVowel = this.coreF.syllablesThatStartsWithVowel;
+
 
         this.coreFunctionsExt = new coreFunctionsExt();
         this.getEstExt = this.coreFunctionsExt.getEstExt;
@@ -113,6 +119,7 @@ class magikSpeller {
         this.consonantsO = this.coreF.consonantsO;
         this.consonantsF = this.coreF.consonantsF;
         this.consonantsL = this.coreF.consonantsL;
+        this.validSyllablesEst = this.coreF.validSyllablesEst;
 
         this.isValidSyllablesEst = this.coreFunctionsExt.isValidSyllablesEst;
     }
@@ -120,6 +127,7 @@ class magikSpeller {
     //  
     //Heuristic syllables spliter
     splitInSyllables(word) {
+
         console.time("miScript");
 
         let syllables = [], syllablesTmp = [], pointer = 0;
@@ -131,8 +139,35 @@ class magikSpeller {
 
             if (type === "V") {
 
-                syllables.push(word.slice(pointer, (index + 1))); pointer = index + 1;
-                syllablesTmp = []; return;
+                let syllable = word.slice(pointer, (index + 1));
+                syllables.push(syllable); pointer = index + 1;
+                syllablesTmp = [];
+
+                //If siyllable est start with C is invalid, we pass the spare syllable to previous pos
+                let syllEst = this.getEst(syllable, "array");
+
+                if (syllEst.length > 2) {
+
+                    let _syllable = syllable.slice(0, syllable.length - 1);
+                    let isValEs = this.isValidSyllablesEst([this.getEstExt(_syllable).join("")], [_syllable]);
+
+                    if (isValEs) return;
+
+                    _syllable.split("").some((s, i) => {
+
+                        let probSyll = _syllable.slice(i + 1, _syllable.length);
+                        if (this.getEst(probSyll) === "C" || this.isValidSyllablesEst([this.getEstExt(probSyll)], [probSyll])) {
+
+                            syllables[syllables.length - 2] = syllables.at(-2) + _syllable.slice(0, i + 1);
+                            syllables[syllables.length - 1] = syllables.at(-1).slice(i + 1, 30)
+                            return true;
+                        }
+
+
+                    })
+
+                }
+                return;
             }
             syllablesTmp.push(wordAsArray[index]);
 
@@ -154,6 +189,7 @@ class magikSpeller {
             }
 
         });
+
         syllables[syllables.length - 1] = syllables.at(-1) + syllablesTmp.join("");
         console.timeEnd("miScript");
         return syllables.filter((a) => a !== undefined);
@@ -162,4 +198,4 @@ class magikSpeller {
 
 }
 
-const spell = new magikSpeller();
+const spell = new magikESpeller();
