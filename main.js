@@ -20,7 +20,7 @@ class coreFunctions {
 
     syllablesThatStartsWithVowel = [
         //A
-        'a', 'an', 'amb', 'amp', 'al', 'arr', 'ar',
+        'an', 'amb', 'amp', 'al', 'arr', 'ar',
         //E
         'es', 'en', 'emp', 'en', 'err', 'er',
         //I
@@ -31,7 +31,7 @@ class coreFunctions {
         'un'
     ];
 
-    validSyllablesEst = ['COCL', 'CFCL', 'dr', 'dl', 'ph', 'ps', 'rr'];
+    validSyllablesEst = ['CSCL', 'CFCL', 'dr', 'dl', 'ph', 'ps', 'rr', 'bl'];
 
     constructor() { };
 
@@ -71,6 +71,9 @@ class coreFunctions {
     //
     isValidSyllablesEst(syllablesEstAsArray, syllabesAsArray) {
 
+        syllablesEstAsArray = syllablesEstAsArray.map((s) => s.replaceAll("V", ""));
+        syllabesAsArray = syllabesAsArray.map((s) => s.replaceAll(/a|e|i|o|u/g, ""));
+
         return [...syllablesEstAsArray].some((est, index) => {
             if (this.validSyllablesEst.includes(est) || this.validSyllablesEst.includes(syllabesAsArray[index]))
                 return true;
@@ -95,7 +98,7 @@ class coreFunctionsExt extends coreFunctions {
 
             if (est === "V") return "V";
 
-            if (this.consonantsS.includes(wordAsArray[index])) return "CO";
+            if (this.consonantsS.includes(wordAsArray[index])) return "CS";
             if (this.consonantsF.includes(wordAsArray[index])) return "CF";
             if (this.consonantsL.includes(wordAsArray[index])) return "CL";
 
@@ -138,88 +141,102 @@ class magikESpeller {
 
         console.time("miScript");
 
-        let syllables = [], syllablesTmp = [], pointer = 0;
+        let syllables = [], syllablesTmp = "", pointer = 0;
         let wordAsArray = word.split("");
         let wordAsEstArray = this.getEst(word, "array");
 
+        const tmpAdd = (currentLetter) => { syllablesTmp += currentLetter; }
+        const tmpPush = (currentLetter) => { syllables.push(syllablesTmp + currentLetter); syllablesTmp = ""; }
+        const lastCharCheck = () => {
 
-        wordAsEstArray.forEach((type, index) => {
+            if (this.getEst(syllables.at(-1)) !== "C")
+                return syllables;
 
-            if (type === "V") {
+            syllables[syllables.length - 2] = syllables.at(-2) + syllables.at(-1);
+            syllables.pop();
+            return syllables;
+        }
 
-                let syllable = word.slice(pointer, (index + 1));
-                syllables.push(syllable); pointer = index + 1;
-                syllablesTmp = [];
+        const postProcessing = (syllables) => {
 
-                //If siyllable est start with C is invalid, we pass the spare syllable to previous pos
-                let syllEst = this.getEst(syllable, "array");
+            let r = [];
+            syllables = syllables[syllables.length - 1] = syllables.at(-1).replaceAll("undefined", "");
 
-                if (syllEst.length <= 2)
-                    return;
 
-                let _syllable = syllable.slice(0, syllable.length - 1);
-                let isValEs = this.isValidSyllablesEst([this.getEstExt(_syllable).join("")], [_syllable]);
+            r = lastCharCheck(r).filter((s) => s !== "");
+            return r;
+        }
 
-                if (isValEs) return;
+        for (let index = 0; index < wordAsArray.length; index++) {
 
-                _syllable.split("").some((s, i) => {
+            let prevType = wordAsEstArray[index - 1] ?? "NN",
+                currentLetter = wordAsArray[index],
+                currentType = wordAsEstArray[index],
+                nextLetter = wordAsArray[index + 1] ?? false,
+                nextNextLetter = wordAsArray[index + 2] ?? "",
+                pointerCalc = () => syllables.join("").length + syllablesTmp.length - 1;
 
-                    let probSyll = _syllable.slice(i + 1, _syllable.length);
-                    if (this.getEst(probSyll) === "C" || this.isValidSyllablesEst([this.getEstExt(probSyll)], [probSyll])) {
+            if (index <= pointerCalc())
+                continue;
 
-                        syllables[syllables.length - 2] = syllables.at(-2) + _syllable.slice(0, i + 1);
-                        syllables[syllables.length - 1] = syllables.at(-1).slice(i + 1, 30)
-                        return true;
-                    }
+            if (currentType === "C") {
 
-                })
-                return;
+                tmpAdd(currentLetter);
+                if (index === wordAsArray.length - 1) { tmpPush() }
+                continue;
             }
 
-            syllablesTmp.push(wordAsArray[index]);
+            if (!nextLetter) { tmpPush(currentLetter); continue; }
 
-            if (wordAsEstArray[index + 1] === "C" || syllablesTmp.length == 0)
-                return;
+            let probJointSyllable2 = currentLetter + nextLetter;
+            let probJointSyllable3 = currentLetter + nextLetter + nextNextLetter;
+            let reverseSearchResult2 = this.reverseSearch((probJointSyllable2), this.syllablesThatStartsWithVowel, true);
+            let reverseSearchResult3 = this.reverseSearch((probJointSyllable3), this.syllablesThatStartsWithVowel, true);
+            let reverseResult = !reverseSearchResult3 ? reverseSearchResult2 : reverseSearchResult3;
 
-            let probSyllableStartsWithV = syllables.at(-1) + syllablesTmp.join("");
+            let probJointSyllable = this.diphthongs.includes(probJointSyllable3) ? probJointSyllable3 :
+                (this.diphthongs.includes(probJointSyllable2) ? probJointSyllable2 : false);
 
-            // We purge non valid syllabes
-            if (!this.isValid(probSyllableStartsWithV) || this.getEst(probSyllableStartsWithV[0]) === "C")
-                return;
+            if (!probJointSyllable && !reverseResult || ((prevType + currentType) === "CV")
+                && !probJointSyllable) {
 
-            let reverseSearchResult = this.reverseSearch(probSyllableStartsWithV, this.syllablesThatStartsWithVowel, true);
-            // We check if the probable syllable that starts with a vowel exits in array syllablesThatStartsWithVowel
-            // And the result given by reverse Search its valid
-            if (reverseSearchResult !== false && this.getEst(reverseSearchResult, "array")[0] !== "C") {
-                syllables[syllables.length - 1] = reverseSearchResult;
-                pointer = syllables.join("").length;
+                tmpPush(currentLetter); continue;
             }
 
-            // Checking for diphthongs
-            if (syllables.at(-2) === undefined)
-                return;
+            let leftoverPointer = (pointerCalc() + reverseResult.length) === (word.length);
 
-            let probDiph = syllables.at(-2).split("").pop() + syllables.at(-1).split("").shift();
-            if (!this.diphthongs.includes(probDiph))
-                return;
+            if (reverseResult !== false && !probJointSyllable) {
 
-            syllables[syllables.length - 2] = syllables.at(-2).slice(0, syllables.at(-2).length - 1) + probDiph;
-            syllables[syllables.length - 1] = syllables.at(-1).slice(1, syllables.at(-1).length);
+                if (leftoverPointer)
+                    reverseResult = reverseResult.slice(0, reverseResult.length - 1)
+                tmpPush(reverseResult); continue;
+            }
 
-            if (syllables[syllables.length - 1].length > 1)
-                return;
+            leftoverPointer = (pointerCalc() + probJointSyllable.length) + 2 === (word.length - 1);
 
-            syllables[syllables.length - 1] = syllables[syllables.length - 1] + wordAsArray[index + 1];
-            pointer = index + 1;
+            if (probJointSyllable !== false) {
 
+                !leftoverPointer ? probJointSyllable += nextNextLetter : probJointSyllable;
 
+                if (!leftoverPointer) {
 
-        });
+                    let lastEst = this.getEst(word.slice((pointerCalc() + probJointSyllable.length)));
+                    let lastChars = word.slice((pointerCalc() + probJointSyllable.length));
+                    let lastEstExt = this.getEstExt(word.slice((pointerCalc() + probJointSyllable.length)));
 
-        syllables[syllables.length - 1] = syllables.at(-1) + syllablesTmp.join("");
-        console.timeEnd("miScript");
-        return syllables.filter((a) => a !== undefined);
+                    lastChars = lastChars.replaceAll(/a|e|i|o|u/g, "");
+                    lastEstExt = lastEstExt.includes("V") ? lastEstExt.join("").split("V")[0] : lastEstExt.join("");
 
+                    if (lastEst === "CVC" || this.isValidSyllablesEst([lastEstExt], [lastChars]))
+                        probJointSyllable = probJointSyllable.slice(0, probJointSyllable.length - 1)
+                }
+
+                tmpPush(probJointSyllable);
+            }
+            if (pointerCalc() === wordAsArray.length - 1) { tmpPush() };
+        }
+
+        return postProcessing(syllables);
     }
 
 }
