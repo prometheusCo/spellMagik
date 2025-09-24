@@ -141,7 +141,7 @@ class magikESpeller {
 
         console.time("miScript");
 
-        let syllables = [], syllablesTmp = "", pointer = 0;
+        let syllables = [], syllablesTmp = "";
         let wordAsArray = word.split("");
         let wordAsEstArray = this.getEst(word, "array");
 
