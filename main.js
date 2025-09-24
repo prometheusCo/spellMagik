@@ -216,10 +216,11 @@ class magikESpeller {
 
             leftoverPointer = (pointerCalc() + probJointSyllable.length) + 2 === (word.length - 1);
 
-            if (!probJointSyllable) { emptyPush(pointerCalc()); continue }
+            if (!probJointSyllable) { emptyPush(pointerCalc()); continue; }
 
             !leftoverPointer ? probJointSyllable += nextNextLetter : probJointSyllable;
-            if (leftoverPointer) {
+
+            if (!leftoverPointer) {
 
                 let lastEst = this.getEst(word.slice((pointerCalc() + probJointSyllable.length)));
                 let lastChars = word.slice((pointerCalc() + probJointSyllable.length));
@@ -231,11 +232,9 @@ class magikESpeller {
                 if (lastEst === "CVC" || this.isValidSyllablesEst([lastEstExt], [lastChars]))
                     probJointSyllable = probJointSyllable.slice(0, probJointSyllable.length - 1)
             }
-
             tmpPush(probJointSyllable);
-            emptyPush(pointerCalc());
-        }
 
+        }
         console.timeEnd("miScript");
         return postProcessing(syllables);
     }
