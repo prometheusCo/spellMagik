@@ -6,9 +6,17 @@ class coreFunctions {
     vowelsClosed = ['i', 'u'];
     vowels = [...this.vowelsOpened, ...this.vowelsClosed];
 
-    consonantsO = ['p', 't', 'k', 'b', 'd', 'g'];
+    consonantsS = ['p', 't', 'k', 'b', 'd', 'g'];
     consonantsF = ['f', 's', 'j', 'z', 'c', 'y', 'll'];
     consonantsL = ['l', 'r'];
+
+    diphthongs = [
+        "ia", "ie", "io",
+        "ua", "ue", "uo",
+        "ai", "ei", "oi",
+        "au", "eu", "ou",
+        "iu", "ui"
+    ];
 
     syllablesThatStartsWithVowel = [
         //A
@@ -50,7 +58,7 @@ class coreFunctions {
     // Reverse array search
     reverseSearch(word, array, loose = false) {
 
-        let r = false; console.log("=>" + word); console.log(array);
+        let r = false;
         array.some((a) => {
             if ((word.indexOf(a) >= 0 && loose) || (word === a)) {
                 r = a; return true;
@@ -87,7 +95,7 @@ class coreFunctionsExt extends coreFunctions {
 
             if (est === "V") return "V";
 
-            if (this.consonantsO.includes(wordAsArray[index])) return "CO";
+            if (this.consonantsS.includes(wordAsArray[index])) return "CO";
             if (this.consonantsF.includes(wordAsArray[index])) return "CF";
             if (this.consonantsL.includes(wordAsArray[index])) return "CL";
 
@@ -110,13 +118,13 @@ class magikESpeller {
         this.isValid = this.coreF.isValid;
         this.reverseSearch = this.coreF.reverseSearch;
         this.syllablesThatStartsWithVowel = this.coreF.syllablesThatStartsWithVowel;
-
+        this.diphthongs = this.coreF.diphthongs;
 
         this.coreFunctionsExt = new coreFunctionsExt();
         this.getEstExt = this.coreFunctionsExt.getEstExt;
 
         this.vowels = this.coreF.vowels;
-        this.consonantsO = this.coreF.consonantsO;
+        this.consonantsS = this.coreF.consonantsS;
         this.consonantsF = this.coreF.consonantsF;
         this.consonantsL = this.coreF.consonantsL;
         this.validSyllablesEst = this.coreF.validSyllablesEst;
@@ -179,13 +187,32 @@ class magikESpeller {
             if (!this.isValid(probSyllableStartsWithV) || this.getEst(probSyllableStartsWithV[0]) === "C")
                 return;
 
-            let reverseSearchResult = this.reverseSearch(probSyllableStartsWithV, this.syllablesThatStartsWithVowel, true); console.log(reverseSearchResult);
+            let reverseSearchResult = this.reverseSearch(probSyllableStartsWithV, this.syllablesThatStartsWithVowel, true);
             // We check if the probable syllable that starts with a vowel exits in array syllablesThatStartsWithVowel
             // And the result given by reverse Search its valid
             if (reverseSearchResult !== false && this.getEst(reverseSearchResult, "array")[0] !== "C") {
                 syllables[syllables.length - 1] = reverseSearchResult;
                 pointer = syllables.join("").length;
             }
+
+            // Checking for diphthongs
+            if (syllables.at(-2) === undefined)
+                return;
+
+            let probDiph = syllables.at(-2).split("").pop() + syllables.at(-1).split("").shift();
+            if (!this.diphthongs.includes(probDiph))
+                return;
+
+            syllables[syllables.length - 2] = syllables.at(-2).slice(0, syllables.at(-2).length - 1) + probDiph;
+            syllables[syllables.length - 1] = syllables.at(-1).slice(1, syllables.at(-1).length);
+
+            if (syllables[syllables.length - 1].length > 1)
+                return;
+
+            syllables[syllables.length - 1] = syllables[syllables.length - 1] + wordAsArray[index + 1];
+            pointer = index + 1;
+
+
 
         });
 
