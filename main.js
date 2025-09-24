@@ -147,6 +147,8 @@ class magikESpeller {
 
         const tmpAdd = (currentLetter) => { syllablesTmp += currentLetter; }
         const tmpPush = (currentLetter) => { syllables.push(syllablesTmp + currentLetter); syllablesTmp = ""; }
+        const emptyPush = (_pointerCalc) => { if (_pointerCalc === wordAsArray.length - 1) { tmpPush("") }; }
+
         const lastCharCheck = () => {
 
             if (this.getEst(syllables.at(-1)) !== "C")
@@ -214,26 +216,24 @@ class magikESpeller {
 
             leftoverPointer = (pointerCalc() + probJointSyllable.length) + 2 === (word.length - 1);
 
-            if (probJointSyllable !== false) {
+            if (!probJointSyllable) { emptyPush(pointerCalc()); continue }
 
-                !leftoverPointer ? probJointSyllable += nextNextLetter : probJointSyllable;
+            !leftoverPointer ? probJointSyllable += nextNextLetter : probJointSyllable;
+            if (leftoverPointer) {
 
-                if (!leftoverPointer) {
+                let lastEst = this.getEst(word.slice((pointerCalc() + probJointSyllable.length)));
+                let lastChars = word.slice((pointerCalc() + probJointSyllable.length));
+                let lastEstExt = this.getEstExt(word.slice((pointerCalc() + probJointSyllable.length)));
 
-                    let lastEst = this.getEst(word.slice((pointerCalc() + probJointSyllable.length)));
-                    let lastChars = word.slice((pointerCalc() + probJointSyllable.length));
-                    let lastEstExt = this.getEstExt(word.slice((pointerCalc() + probJointSyllable.length)));
+                lastChars = lastChars.replaceAll(/a|e|i|o|u/g, "");
+                lastEstExt = lastEstExt.includes("V") ? lastEstExt.join("").split("V")[0] : lastEstExt.join("");
 
-                    lastChars = lastChars.replaceAll(/a|e|i|o|u/g, "");
-                    lastEstExt = lastEstExt.includes("V") ? lastEstExt.join("").split("V")[0] : lastEstExt.join("");
-
-                    if (lastEst === "CVC" || this.isValidSyllablesEst([lastEstExt], [lastChars]))
-                        probJointSyllable = probJointSyllable.slice(0, probJointSyllable.length - 1)
-                }
-
-                tmpPush(probJointSyllable);
+                if (lastEst === "CVC" || this.isValidSyllablesEst([lastEstExt], [lastChars]))
+                    probJointSyllable = probJointSyllable.slice(0, probJointSyllable.length - 1)
             }
-            if (pointerCalc() === wordAsArray.length - 1) { tmpPush() };
+
+            tmpPush(probJointSyllable);
+            emptyPush(pointerCalc());
         }
 
         console.timeEnd("miScript");
