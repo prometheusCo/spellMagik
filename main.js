@@ -236,6 +236,7 @@ class magikESpeller {
             if (pointerCalc() === wordAsArray.length - 1) { tmpPush() };
         }
 
+        console.timeEnd("miScript");
         return postProcessing(syllables);
     }
 
