@@ -214,7 +214,7 @@ const test = () => {
                 ["subrayar", ["su", "bra", "yar"]],   // corregido
                 ["anglosajón", ["an", "glo", "sa", "jón"]],
                 ["perspectiva", ["pers", "pec", "ti", "va"]],
-                ["adscripción", ["ad", "scrip", "ción"]], // corregido (aprendizaje culto)
+                ["adscripción", ["ads", "crip", "ción"]], // corregido (aprendizaje culto)
             ], (word, expected) => expectSyllables(word, expected));
         });
 
