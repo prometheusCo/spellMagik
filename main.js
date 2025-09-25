@@ -17,7 +17,7 @@ class coreFunctions {
         "ua", "ue", "uo",
         "ai", "ei", "oi",
         "au", "eu", "ou",
-        "iu", "ui"
+        "iu", "ui", "ai"
     ];
 
     syllablesThatStartsWithVowel = [
@@ -37,11 +37,13 @@ class coreFunctions {
 
     constructor() { };
 
+    clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+
     //
     // Given a word, returns it's structure (VOWEL + CONSONANT + VOWEL...)
     getEst(word, returnType = "string") {
 
-        let r = word.split("").map((a) => this.vowels.includes(a) ? "V" : "C");
+        let r = word.split("").map((a) => this.vowels.includes(this.clean(a)) ? "V" : "C");
         if (returnType === "string")
             return r.join("");
 
@@ -129,7 +131,7 @@ class magikESpeller {
         this.diphthongs = this.coreF.diphthongs;
         this.accents = this.coreF.accents;
         this.hasAccent = this.coreF.hasAccent;
-
+        this.clean = this.coreF.clean;
 
         this.coreFunctionsExt = new coreFunctionsExt();
         this.getEstExt = this.coreFunctionsExt.getEstExt;
@@ -257,8 +259,8 @@ class magikESpeller {
             let reverseResult = !reverseSearchResult3 ? reverseSearchResult2 : reverseSearchResult3;
 
             // Same as above but with the types of dipthongs
-            let probJointSyllable = this.diphthongs.includes(probJointSyllable3) ? probJointSyllable3 :
-                (this.diphthongs.includes(probJointSyllable2) ? probJointSyllable2 : false);
+            let probJointSyllable = this.diphthongs.includes(this.clean(probJointSyllable3)) ? probJointSyllable3 :
+                (this.diphthongs.includes(this.clean(probJointSyllable2)) ? probJointSyllable2 : false);
 
             //
             // === > Early negative return for cases in wich no dipthong or syllable that starts in vowel is found
@@ -288,7 +290,18 @@ class magikESpeller {
             //
             // === >  If an accent is found in any vowel in the dipthong, we treat it as a normal syllable and skip
             //
-            if (!probJointSyllable || this.hasAccent(currentLetter)) { emptyPush(pointerCalc()); continue; }
+            if (!probJointSyllable || this.hasAccent(currentLetter) || this.hasAccent(nextLetter)) {
+
+                if (this.hasAccent(currentLetter) || this.hasAccent(nextLetter)) {
+
+                    probJointSyllable = probJointSyllable.split("")[0];
+                    tmpPush(probJointSyllable);
+                    continue;
+                }
+
+                emptyPush(pointerCalc());
+                continue;
+            }
 
             !leftoverPointer ? probJointSyllable += nextNextLetter : probJointSyllable;
 
@@ -308,6 +321,7 @@ class magikESpeller {
 
         }
         console.timeEnd("miScript");
+        console.log(syllables);
         return postProcessing(syllables);
     }
 
