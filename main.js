@@ -155,7 +155,9 @@ class magikESpeller {
     //Heuristic syllables spliter
     splitInSyllables(word) {
 
-        const cap = this.isCapitalized(word) ? true : false; word = word.toLowerCase();
+        const cap = this.isCapitalized(word) ? true : false;
+        const isupc = cap && (word.charAt(word.length - 1).toLowerCase() !== word.charAt(word.length - 1)) ? true : false;
+        word = word.toLowerCase();
         console.time("miScript");
 
         let syllables = []; // syllabes array, each position is a syllable
@@ -333,6 +335,9 @@ class magikESpeller {
         console.timeEnd("miScript");
         if (cap)
             syllables[0] = this.capitalize(syllables[0]);
+
+        if (isupc)
+            syllables = syllables.map((s) => s.toUpperCase());
 
         return postProcessing(syllables);
     }

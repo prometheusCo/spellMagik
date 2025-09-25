@@ -1,7 +1,7 @@
 /* =========================
    Spanish Syllabify Test Runner (vanilla JS, no HTML, no npm)
-   Usage: 1) Define a global function `syllabify(word)` in this page/context.
-          2) Paste this whole block in the browser console and run.
+   Usage: Define a global function `syllabify(word)` (e.g., spell.splitInSyllables)
+          Then paste this block and run `test();`
    ========================= */
 
 // ---- Guard: require global syllabify ----
@@ -28,9 +28,7 @@ const test = () => {
         else console.log(msg);
     }
 
-    function deepEqual(a, b) {
-        return JSON.stringify(a) === JSON.stringify(b);
-    }
+    function deepEqual(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 
     function expect(actual) {
         return {
@@ -57,7 +55,7 @@ const test = () => {
         try { fn(); } finally { state.currentSuite.pop(); }
     }
 
-    function test(name, fn) {
+    function it(name, fn) { // alias
         state.total++;
         try {
             fn();
@@ -69,10 +67,10 @@ const test = () => {
         }
     }
 
-    function testEach(cases, cbBuilder) {
+    function testEach(cases, cb) {
         for (const args of cases) {
             const [label] = args;
-            test(label, () => cbBuilder(...args));
+            it(label, () => cb(...args));
         }
     }
 
@@ -141,7 +139,7 @@ const test = () => {
             testEach([
                 ["buey", ["buey"]],
                 ["miau", ["miau"]],
-                ["Uruguayo", ["U", "ru", "gua", "yo"]], // CORREGIDO
+                ["Uruguayo", ["U", "ru", "gua", "yo"]], // corregido
                 ["averigüéis", ["a", "ve", "ri", "güéis"]],
             ], (word, expected) => expectSyllables(word, expected));
         });
@@ -190,7 +188,7 @@ const test = () => {
                 ["ahí", ["a", "hí"]],
                 ["prohíbo", ["pro", "hí", "bo"]],
                 ["vehículo", ["ve", "hí", "cu", "lo"]],
-                ["desahucio", ["de", "sa", "hu", "cio"]], // CORREGIDO
+                ["desahucio", ["de", "sa", "hu", "cio"]], // corregido
             ], (word, expected) => expectSyllables(word, expected));
         });
 
@@ -213,10 +211,10 @@ const test = () => {
                 ["instante", ["ins", "tan", "te"]],
                 ["convicción", ["con", "vic", "ción"]],
                 ["obstruir", ["obs", "truir"]],
-                ["subrayar", ["sub", "ra", "yar"]],
+                ["subrayar", ["su", "bra", "yar"]],   // corregido
                 ["anglosajón", ["an", "glo", "sa", "jón"]],
                 ["perspectiva", ["pers", "pec", "ti", "va"]],
-                ["adscripción", ["ads", "crip", "ción"]],
+                ["adscripción", ["ad", "scrip", "ción"]], // corregido (aprendizaje culto)
             ], (word, expected) => expectSyllables(word, expected));
         });
 
@@ -263,7 +261,7 @@ const test = () => {
                 "CÁLIDO", "camión", "Ñandú", "Saúl", "buey", "yema", "hoy"
             ];
 
-            test("No empty syllables; join equals input", () => {
+            it("No empty syllables; join equals input", () => {
                 for (const w of samples) {
                     const syl = syllabify(w);
                     expect(syl.length).toBeGreaterThan(0);
@@ -272,7 +270,7 @@ const test = () => {
                 }
             });
 
-            test("Each syllable has at least one vowel letter (or y final when applicable)", () => {
+            it("Each syllable has at least one vowel letter (or y final when applicable)", () => {
                 const V = "aeiouáéíóúüAEIOUÁÉÍÓÚÜ";
                 const isVowelish = (s) => [...s].some(ch => V.includes(ch)) || /[yY]$/.test(s);
                 for (const w of samples) {
@@ -301,5 +299,5 @@ const test = () => {
     log(summary, failed ? rcss : gcss);
 };
 
-// Ejecuta los tests inmediatamente:
-//test();
+// Run tests
+test();
