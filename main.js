@@ -10,6 +10,8 @@ class coreFunctions {
     consonantsF = ['f', 's', 'j', 'z', 'c', 'y', 'll'];
     consonantsL = ['l', 'r'];
 
+    accents = ['á', 'é', 'í', 'ó', 'ú'];
+
     diphthongs = [
         "ia", "ie", "io",
         "ua", "ue", "uo",
@@ -24,7 +26,7 @@ class coreFunctions {
         //E
         'es', 'en', 'emp', 'en', 'err', 'er',
         //I
-        'ins', 'im', 'in',
+        'ins', 'im', 'in', 'or',
         //O
         'obs', 'os',
         //U
@@ -80,6 +82,9 @@ class coreFunctions {
             return false;
         })
     }
+    //
+    //
+    hasAccent(vowel) { return this.accents.includes(vowel); }
 
 }
 
@@ -122,6 +127,9 @@ class magikESpeller {
         this.reverseSearch = this.coreF.reverseSearch;
         this.syllablesThatStartsWithVowel = this.coreF.syllablesThatStartsWithVowel;
         this.diphthongs = this.coreF.diphthongs;
+        this.accents = this.coreF.accents;
+        this.hasAccent = this.coreF.hasAccent;
+
 
         this.coreFunctionsExt = new coreFunctionsExt();
         this.getEstExt = this.coreFunctionsExt.getEstExt;
@@ -149,23 +157,47 @@ class magikESpeller {
         const tmpPush = (currentLetter) => { syllables.push(syllablesTmp + currentLetter); syllablesTmp = ""; }
         const emptyPush = (_pointerCalc) => { if (_pointerCalc === wordAsArray.length - 1) { tmpPush("") }; }
 
-        const lastCharCheck = () => {
+        const lastCharCheck = (_syllables) => {
 
-            if (this.getEst(syllables.at(-1)) !== "C")
+            if (this.getEst(_syllables.at(-1)) !== "C")
                 return syllables;
 
-            syllables[syllables.length - 2] = syllables.at(-2) + syllables.at(-1);
-            syllables.pop();
-            return syllables;
+            _syllables[_syllables.length - 2] = _syllables.at(-2) + _syllables.at(-1);
+            _syllables.pop();
+            return _syllables;
         }
 
         const postProcessing = (syllables) => {
 
-            let r = [];
-            syllables = syllables[syllables.length - 1] = syllables.at(-1).replaceAll("undefined", "");
+            syllables[syllables.length - 1] = syllables.at(-1).replaceAll("undefined", "");
+            let r = lastCharCheck(syllables).filter((s) => s !== "");
 
+            for (let x = 0; x < 2; x++) {
 
-            r = lastCharCheck(r).filter((s) => s !== "");
+                r.forEach((syllabe, index) => {
+
+                    let prevSyllable = r[index - 1] ?? false;
+                    if (!prevSyllable)
+                        return;
+
+                    let prevLetter = prevSyllable.slice(prevSyllable.length - 1);
+                    let prevSyllableEst = this.getEst(prevLetter);
+                    let syllabeEst = this.getEst(syllabe);
+                    let prevPrevLetter = prevSyllable.slice(prevSyllable.length - 2) ?? "";
+                    let cutIndex = 1;
+
+                    if (prevSyllableEst + syllabeEst !== "CV")
+                        return;
+
+                    if (prevPrevLetter === "rr") { prevLetter = "rr"; cutIndex = 2; }
+
+                    r[index] = prevLetter + syllabe;
+                    r[index - 1] = prevSyllable.slice(0, prevSyllable.length - cutIndex);
+
+                })
+
+            }
+            r = r.filter((s) => s !== "");
             return r;
         }
 
@@ -184,7 +216,7 @@ class magikESpeller {
             if (currentType === "C") {
 
                 tmpAdd(currentLetter);
-                if (index === wordAsArray.length - 1) { tmpPush() }
+                if (index === wordAsArray.length - 1) { tmpPush("") }
                 continue;
             }
 
@@ -199,9 +231,7 @@ class magikESpeller {
             let probJointSyllable = this.diphthongs.includes(probJointSyllable3) ? probJointSyllable3 :
                 (this.diphthongs.includes(probJointSyllable2) ? probJointSyllable2 : false);
 
-            if (!probJointSyllable && !reverseResult || ((prevType + currentType) === "CV")
-                && !probJointSyllable) {
-
+            if ((!probJointSyllable && !reverseResult) && !probJointSyllable) {
                 tmpPush(currentLetter); continue;
             }
 
@@ -216,7 +246,7 @@ class magikESpeller {
 
             leftoverPointer = (pointerCalc() + probJointSyllable.length) + 2 === (word.length - 1);
 
-            if (!probJointSyllable) { emptyPush(pointerCalc()); continue; }
+            if (!probJointSyllable || this.hasAccent(currentLetter)) { emptyPush(pointerCalc()); continue; }
 
             !leftoverPointer ? probJointSyllable += nextNextLetter : probJointSyllable;
 
@@ -235,7 +265,7 @@ class magikESpeller {
             tmpPush(probJointSyllable);
 
         }
-        console.timeEnd("miScript");
+        console.timeEnd("miScript"); console.log("raw result"); console.log(syllables);
         return postProcessing(syllables);
     }
 
