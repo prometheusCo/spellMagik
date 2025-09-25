@@ -49,7 +49,7 @@ class coreFunctions {
     }
 
     //
-    //
+    // this checks for any kind of invalid input
     isValid(val) {
         if (val === undefined || val === null || val.indexOf("undefined") >= 0 || val.indexOf("null") >= 0)
             return false;
@@ -70,7 +70,7 @@ class coreFunctions {
     }
 
     //
-    //
+    // Gives true if structure given is a valid spanish syllable est
     isValidSyllablesEst(syllablesEstAsArray, syllabesAsArray) {
 
         syllablesEstAsArray = syllablesEstAsArray.map((s) => s.replaceAll("V", ""));
@@ -149,14 +149,18 @@ class magikESpeller {
 
         console.time("miScript");
 
-        let syllables = [], syllablesTmp = "";
-        let wordAsArray = word.split("");
-        let wordAsEstArray = this.getEst(word, "array");
+        let syllables = []; // syllabes array, each position is a syllable
+        let syllablesTmp = ""; // tmp array used to store consonants bettwen found vowels
+        let wordAsArray = word.split(""); // word given as an array of letters
+        let wordAsEstArray = this.getEst(word, "array"); // word est (eje : CVC) also as array
 
+        // This adds a letter to tmp array
         const tmpAdd = (currentLetter) => { syllablesTmp += currentLetter; }
+        // This push what's stored in tmp + current letter to syllables's array last position
         const tmpPush = (currentLetter) => { syllables.push(syllablesTmp + currentLetter); syllablesTmp = ""; }
+        // this checks if we have reached the end of the word and push wht's left in tmp to sayllables 
         const emptyPush = (_pointerCalc) => { if (_pointerCalc === wordAsArray.length - 1) { tmpPush("") }; }
-
+        // this fixes some problems with last chars 
         const lastCharCheck = (_syllables) => {
 
             if (this.getEst(_syllables.at(-1)) !== "C")
@@ -166,7 +170,8 @@ class magikESpeller {
             _syllables.pop();
             return _syllables;
         }
-
+        // This fixes wrong syllables that are made of one vowel, by moving letters around it does 2 loops but you
+        // can make it to loop N times just to be 100% sure
         const postProcessing = (syllables) => {
 
             syllables[syllables.length - 1] = syllables.at(-1).replaceAll("undefined", "");
@@ -201,6 +206,12 @@ class magikESpeller {
             return r;
         }
 
+        //
+        // Main method loop
+        // Iterates each letter, if its a consonant, stores it in tmp array, if it's a vowel
+        // saves it to syllables array, adding what's stored in tmp before it
+        // it has rules to handle dipthongs and syllables that starts in vowel and end in consonant
+        //
         for (let index = 0; index < wordAsArray.length; index++) {
 
             let prevType = wordAsEstArray[index - 1] ?? "NN",
@@ -209,34 +220,61 @@ class magikESpeller {
                 nextLetter = wordAsArray[index + 1] ?? false,
                 nextNextLetter = wordAsArray[index + 2] ?? "",
                 pointerCalc = () => syllables.join("").length + syllablesTmp.length - 1;
+            // code above calcs current pointer
+            // the pointer is the last pos of what's already splited in syllables
 
+            // This prevents adding again already added letters to syllables array when the pointer is moved forward 
+            // after a dipthong or a syllable that starts in vowel is found
             if (index <= pointerCalc())
                 continue;
 
+            // Early negative return for when the current letter is a consonant
             if (currentType === "C") {
 
+                //
+                // => Adding current consonant to tmp  so it can be prepended to next's vowel's syllable  when found
                 tmpAdd(currentLetter);
                 if (index === wordAsArray.length - 1) { tmpPush("") }
                 continue;
             }
 
+            // Early negative return for when there's no next letter
+            // Bellow code is for checking dipthongs and  syllables starting in vowels...
             if (!nextLetter) { tmpPush(currentLetter); continue; }
 
-            let probJointSyllable2 = currentLetter + nextLetter;
-            let probJointSyllable3 = currentLetter + nextLetter + nextNextLetter;
+            //
+            //Here we form posible candidates for dipthongs and  syllables that starts...
+            //
+            let probJointSyllable2 = currentLetter + nextLetter; // in, ar, or, al type of syllables
+            let probJointSyllable3 = currentLetter + nextLetter + nextNextLetter; // ins, amp, amb... type of syllables
+            //
+            //here we store the results for  reverse searches, if nothing found var is false
             let reverseSearchResult2 = this.reverseSearch((probJointSyllable2), this.syllablesThatStartsWithVowel, true);
             let reverseSearchResult3 = this.reverseSearch((probJointSyllable3), this.syllablesThatStartsWithVowel, true);
+
+            // global result for reverse searches: if a reverse search with 3 letter is found we take that as the
+            // global result, otherwise we take the reverseSearchResult for 2 letters (something or false)
             let reverseResult = !reverseSearchResult3 ? reverseSearchResult2 : reverseSearchResult3;
 
+            // Same as above but with the types of dipthongs
             let probJointSyllable = this.diphthongs.includes(probJointSyllable3) ? probJointSyllable3 :
                 (this.diphthongs.includes(probJointSyllable2) ? probJointSyllable2 : false);
 
+            //
+            // === > Early negative return for cases in wich no dipthong or syllable that starts in vowel is found
+            // in those cases we added this vowel to the syllables array prepending current tmp data and skip 
+            //
             if ((!probJointSyllable && !reverseResult) && !probJointSyllable) {
                 tmpPush(currentLetter); continue;
             }
 
+            // this is kind of tricky: is used to know wether we have reach the probable end
+            // in case of forming a syllable that starts in vowel.
             let leftoverPointer = (pointerCalc() + reverseResult.length) === (word.length);
 
+            //
+            // === > Pushing the syllable that starts in vowel to global result array and skiping  the rest
+            //
             if (reverseResult !== false && !probJointSyllable) {
 
                 if (leftoverPointer)
@@ -244,8 +282,12 @@ class magikESpeller {
                 tmpPush(reverseResult); continue;
             }
 
+            // Same as previous example but for dipthongs
             leftoverPointer = (pointerCalc() + probJointSyllable.length) + 2 === (word.length - 1);
 
+            //
+            // === >  If an accent is found in any vowel in the dipthong, we treat it as a normal syllable and skip
+            //
             if (!probJointSyllable || this.hasAccent(currentLetter)) { emptyPush(pointerCalc()); continue; }
 
             !leftoverPointer ? probJointSyllable += nextNextLetter : probJointSyllable;
@@ -265,7 +307,7 @@ class magikESpeller {
             tmpPush(probJointSyllable);
 
         }
-        console.timeEnd("miScript"); console.log("raw result"); console.log(syllables);
+        console.timeEnd("miScript");
         return postProcessing(syllables);
     }
 
