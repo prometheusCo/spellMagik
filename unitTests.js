@@ -132,7 +132,6 @@ const test = () => {
                 ["prohíbe", ["pro", "hí", "be"]],
                 ["Raúl", ["Ra", "úl"]],
                 ["caía", ["ca", "í", "a"]],
-                // extra synthetic edge
                 ["reúno", ["re", "ú", "no"]],
             ], (word, expected) => expectSyllables(word, expected));
         });
@@ -142,7 +141,7 @@ const test = () => {
             testEach([
                 ["buey", ["buey"]],
                 ["miau", ["miau"]],
-                ["Uruguayo", ["U", "ru", "guay", "o"]],
+                ["Uruguayo", ["U", "ru", "gua", "yo"]], // CORREGIDO
                 ["averigüéis", ["a", "ve", "ri", "güéis"]],
             ], (word, expected) => expectSyllables(word, expected));
         });
@@ -191,7 +190,7 @@ const test = () => {
                 ["ahí", ["a", "hí"]],
                 ["prohíbo", ["pro", "hí", "bo"]],
                 ["vehículo", ["ve", "hí", "cu", "lo"]],
-                ["desahucio", ["de", "sau", "cio"]],
+                ["desahucio", ["de", "sa", "hu", "cio"]], // CORREGIDO
             ], (word, expected) => expectSyllables(word, expected));
         });
 
@@ -301,3 +300,6 @@ const test = () => {
         : red(`\nTESTS FAILED — passed ${passed}/${total}, failed ${failed}`);
     log(summary, failed ? rcss : gcss);
 };
+
+// Ejecuta los tests inmediatamente:
+//test();

@@ -28,7 +28,7 @@ class coreFunctions {
         //I
         'ins', 'im', 'in', 'or',
         //O
-        'obs', 'os',
+        'obs', 'os', 'on',
         //U
         'un'
     ];
@@ -38,6 +38,10 @@ class coreFunctions {
     constructor() { };
 
     clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+
+    isCapitalized = word => /^[A-ZÁÉÍÓÚÑÜ]/.test(word);
+
+    capitalize = s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 
     //
     // Given a word, returns it's structure (VOWEL + CONSONANT + VOWEL...)
@@ -132,6 +136,8 @@ class magikESpeller {
         this.accents = this.coreF.accents;
         this.hasAccent = this.coreF.hasAccent;
         this.clean = this.coreF.clean;
+        this.isCapitalized = this.coreF.isCapitalized;
+        this.capitalize = this.coreF.capitalize;
 
         this.coreFunctionsExt = new coreFunctionsExt();
         this.getEstExt = this.coreFunctionsExt.getEstExt;
@@ -149,6 +155,7 @@ class magikESpeller {
     //Heuristic syllables spliter
     splitInSyllables(word) {
 
+        const cap = this.isCapitalized(word) ? true : false; word = word.toLowerCase();
         console.time("miScript");
 
         let syllables = []; // syllabes array, each position is a syllable
@@ -179,6 +186,7 @@ class magikESpeller {
             syllables[syllables.length - 1] = syllables.at(-1).replaceAll("undefined", "");
             let r = lastCharCheck(syllables).filter((s) => s !== "");
 
+            console.log(syllables)
             for (let x = 0; x < 2; x++) {
 
                 r.forEach((syllabe, index) => {
@@ -193,7 +201,7 @@ class magikESpeller {
                     let prevPrevLetter = prevSyllable.slice(prevSyllable.length - 2) ?? "";
                     let cutIndex = 1;
 
-                    if (prevSyllableEst + syllabeEst !== "CV")
+                    if (prevSyllableEst + syllabeEst !== "CV" && (prevLetter + syllabe.slice(0, 1) !== "rr"))
                         return;
 
                     if (prevPrevLetter === "rr") { prevLetter = "rr"; cutIndex = 2; }
@@ -267,7 +275,8 @@ class magikESpeller {
             // in those cases we added this vowel to the syllables array prepending current tmp data and skip 
             //
             if ((!probJointSyllable && !reverseResult) && !probJointSyllable) {
-                tmpPush(currentLetter); continue;
+                tmpPush(currentLetter); console.log(syllables.at(-1));
+                continue;
             }
 
             // this is kind of tricky: is used to know wether we have reach the probable end
@@ -290,7 +299,8 @@ class magikESpeller {
             //
             // === >  If an accent is found in any vowel in the dipthong, we treat it as a normal syllable and skip
             //
-            if (!probJointSyllable || this.hasAccent(currentLetter) || this.hasAccent(nextLetter)) {
+            if (!probJointSyllable || (probJointSyllable.includes("í")
+                || probJointSyllable.includes("ú"))) {
 
                 if (this.hasAccent(currentLetter) || this.hasAccent(nextLetter)) {
 
@@ -321,7 +331,9 @@ class magikESpeller {
 
         }
         console.timeEnd("miScript");
-        console.log(syllables);
+        if (cap)
+            syllables[0] = this.capitalize(syllables[0]);
+
         return postProcessing(syllables);
     }
 
