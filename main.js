@@ -33,7 +33,10 @@ class coreFunctions {
         'un'
     ];
 
-    validSyllablesEst = ['CSCL', 'CFCL', 'dr', 'dl', 'ph', 'ps', 'rr', 'bl'];
+    validSyllablesEst = ['CSCL', 'CFCL',
+
+        'dr', 'dl', 'ph', 'ps', 'rr', 'bl',
+    ]
 
     constructor() { };
 
@@ -78,9 +81,6 @@ class coreFunctions {
     //
     // Gives true if structure given is a valid spanish syllable est
     isValidSyllablesEst(syllablesEstAsArray, syllabesAsArray) {
-
-        syllablesEstAsArray = syllablesEstAsArray.map((s) => s.replaceAll("V", ""));
-        syllabesAsArray = syllabesAsArray.map((s) => s.replaceAll(/a|e|i|o|u/g, ""));
 
         return [...syllablesEstAsArray].some((est, index) => {
             if (this.validSyllablesEst.includes(est) || this.validSyllablesEst.includes(syllabesAsArray[index]))
