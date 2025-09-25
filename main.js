@@ -13,7 +13,7 @@ class coreFunctions {
     accents = ['á', 'é', 'í', 'ó', 'ú'];
 
     diphthongs = [
-        "ia", "ie", "io",
+        "ia", "ie", "io", 'uei',
         "ua", "ue", "uo",
         "ai", "ei", "oi",
         "au", "eu", "ou",
@@ -22,7 +22,7 @@ class coreFunctions {
 
     syllablesThatStartsWithVowel = [
         //A
-        'an', 'amb', 'amp', 'al', 'arr', 'ar',
+        'an', 'amb', 'amp', 'al', 'arr', 'ar', 'ads',
         //E
         'es', 'en', 'emp', 'en', 'err', 'er',
         //I
@@ -33,9 +33,11 @@ class coreFunctions {
         'un'
     ];
 
-    validSyllablesEst = ['CSCL', 'CFCL',
+    validSyllablesEst = ['CSCL', 'CFCL', 'CSVCL', 'CFC',
 
-        'dr', 'dl', 'ph', 'ps', 'rr', 'bl',
+        'dr', 'dl', 'ph', 'ps', 'rr', 'bl', 'ch', 'll', 'rr', 'br', 'tl', 'tr',
+        "pl", "cl", "fl", "gl",
+        "pr", "br", "cr", "fr", "gr"
     ]
 
     constructor() { };
@@ -83,8 +85,13 @@ class coreFunctions {
     isValidSyllablesEst(syllablesEstAsArray, syllabesAsArray) {
 
         return [...syllablesEstAsArray].some((est, index) => {
+
             if (this.validSyllablesEst.includes(est) || this.validSyllablesEst.includes(syllabesAsArray[index]))
                 return true;
+
+            if (this.validSyllablesEst.includes(est.split("V")[0]))
+                return true;
+
             return false;
         })
     }
@@ -113,7 +120,7 @@ class coreFunctionsExt extends coreFunctions {
             if (this.consonantsF.includes(wordAsArray[index])) return "CF";
             if (this.consonantsL.includes(wordAsArray[index])) return "CL";
 
-            return "NN";
+            return "C";
 
         });
 
@@ -191,24 +198,40 @@ class magikESpeller {
             console.log(syllables)
             for (let x = 0; x < 2; x++) {
 
-                r.forEach((syllabe, index) => {
+                r.forEach((syllable, index) => {
 
                     let prevSyllable = r[index - 1] ?? false;
                     if (!prevSyllable)
                         return;
 
-                    let prevLetter = prevSyllable.slice(prevSyllable.length - 1);
+                    let prevLetter = prevSyllable.slice(prevSyllable.length - 1) ?? "";
                     let prevSyllableEst = this.getEst(prevLetter);
-                    let syllabeEst = this.getEst(syllabe);
+                    let syllabeEst = this.getEst(syllable);
                     let prevPrevLetter = prevSyllable.slice(prevSyllable.length - 2) ?? "";
                     let cutIndex = 1;
+                    let isValidEst = this.isValidSyllablesEst([this.getEstExt(syllable).join("")], [syllable]);
+                    let isValidEstVar1 = this.isValidSyllablesEst([this.getEstExt(syllable.slice(1)).join("")], [syllable]);
 
-                    if (prevSyllableEst + syllabeEst !== "CV" && (prevLetter + syllabe.slice(0, 1) !== "rr"))
+                    if (!isValidEst && isValidEstVar1) {
+
+                        r[index] = syllable.slice(1);
+                        r[index - 1] = r[index - 1] + syllable.slice(0, 1);
+                        return;
+                    }
+
+                    if (prevPrevLetter + syllable.slice(0, 1) === "ers") {
+
+                        r[index] = syllable.slice(1)
+                        r[index - 1] = r[index - 1].slice(0, 1) + (prevPrevLetter + syllable.slice(0, 1));
+                        return;
+                    }
+
+                    if (prevSyllableEst + syllabeEst !== "CV" && prevSyllableEst + syllabeEst !== "CVC" && (prevLetter + syllable.slice(0, 1) !== "rr"))
                         return;
 
                     if (prevPrevLetter === "rr") { prevLetter = "rr"; cutIndex = 2; }
 
-                    r[index] = prevLetter + syllabe;
+                    r[index] = prevLetter + syllable;
                     r[index - 1] = prevSyllable.slice(0, prevSyllable.length - cutIndex);
 
                 })
@@ -230,6 +253,7 @@ class magikESpeller {
                 currentLetter = wordAsArray[index],
                 currentType = wordAsEstArray[index],
                 nextLetter = wordAsArray[index + 1] ?? false,
+                prevLetter = wordAsArray[index + 1] ?? false,
                 nextNextLetter = wordAsArray[index + 2] ?? "",
                 pointerCalc = () => syllables.join("").length + syllablesTmp.length - 1;
             // code above calcs current pointer
@@ -277,7 +301,17 @@ class magikESpeller {
             // in those cases we added this vowel to the syllables array prepending current tmp data and skip 
             //
             if ((!probJointSyllable && !reverseResult) && !probJointSyllable) {
-                tmpPush(currentLetter); console.log(syllables.at(-1));
+
+                if (nextLetter === nextNextLetter && nextLetter !== "l" && nextLetter !== "r")
+                    currentLetter += nextNextLetter;
+
+
+                if (prevLetter !== false && this.getEst(nextLetter) === "C" && this.getEst(nextNextLetter) === "C" &&
+                    this.getEst(prevLetter) !== "V" && nextLetter !== nextNextLetter &&
+                    !this.validSyllablesEst.includes(nextLetter + nextNextLetter))
+                    currentLetter += nextLetter;
+
+                tmpPush(currentLetter);
                 continue;
             }
 
