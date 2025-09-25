@@ -20,6 +20,8 @@ class coreFunctions {
         "iu", "ui", "ai"
     ];
 
+    diphthongsExceptions = ["uí", "üí"]
+
     syllablesThatStartsWithVowel = [
         //A
         'an', 'amb', 'amp', 'al', 'arr', 'ar', 'ads',
@@ -145,6 +147,8 @@ class magikESpeller {
         this.clean = this.coreF.clean;
         this.isCapitalized = this.coreF.isCapitalized;
         this.capitalize = this.coreF.capitalize;
+        this.diphthongsExceptions = this.coreF.diphthongsExceptions;
+
 
         this.coreFunctionsExt = new coreFunctionsExt();
         this.getEstExt = this.coreFunctionsExt.getEstExt;
@@ -195,7 +199,6 @@ class magikESpeller {
             syllables[syllables.length - 1] = syllables.at(-1).replaceAll("undefined", "");
             let r = lastCharCheck(syllables).filter((s) => s !== "");
 
-            console.log(syllables)
             for (let x = 0; x < 2; x++) {
 
                 r.forEach((syllable, index) => {
@@ -226,7 +229,7 @@ class magikESpeller {
                         return;
                     }
 
-                    if (prevSyllableEst + syllabeEst !== "CV" && prevSyllableEst + syllabeEst !== "CVC" && (prevLetter + syllable.slice(0, 1) !== "rr"))
+                    if (!this.diphthongs.includes(syllable) && prevSyllableEst + syllabeEst !== "CV" && prevSyllableEst + syllabeEst !== "CVC" && (prevLetter + syllable.slice(0, 1) !== "rr"))
                         return;
 
                     if (prevPrevLetter === "rr") { prevLetter = "rr"; cutIndex = 2; }
@@ -336,13 +339,14 @@ class magikESpeller {
             // === >  If an accent is found in any vowel in the dipthong, we treat it as a normal syllable and skip
             //
             if (!probJointSyllable || (probJointSyllable.includes("í")
-                || probJointSyllable.includes("ú"))) {
+                || probJointSyllable.includes("ú")) && !this.diphthongsExceptions.includes(probJointSyllable)) {
 
                 if (this.hasAccent(currentLetter) || this.hasAccent(nextLetter)) {
 
                     probJointSyllable = probJointSyllable.split("")[0];
                     tmpPush(probJointSyllable);
                     continue;
+
                 }
 
                 emptyPush(pointerCalc());
