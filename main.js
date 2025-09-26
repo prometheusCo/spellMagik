@@ -42,7 +42,7 @@ class coreFunctions {
         "pr", "br", "cr", "fr", "gr"
     ]
 
-    validJoints = ["bs", "ns", "nd", "rs"];
+    validJoints = ["bs", "ns", "nd", "rs", "ll"];
 
     invalidEnds = ["ch", "ll"]
 
@@ -186,6 +186,7 @@ class magikESpeller extends coreFunctionsExt {
             syllables[syllables.length - 1] = syllables.at(-1).replaceAll("undefined", "");
             let r = lastCharCheck(syllables).filter((s) => s !== "");
 
+            console.log(r);
             for (let x = 0; x < 2; x++) {
 
                 r.forEach((syllable, index) => {
@@ -247,6 +248,8 @@ class magikESpeller extends coreFunctionsExt {
             // code above calcs current pointer
             // the pointer is the last pos of what's already splited in syllables
 
+            const leftoverCalc = length => (pointerCalc() + length) === (word.length);
+
             // This prevents adding again already added letters to syllables array when the pointer is moved forward 
             // after a dipthong or a syllable that starts in vowel is found
 
@@ -306,7 +309,7 @@ class magikESpeller extends coreFunctionsExt {
 
             // this is kind of tricky: is used to know wether we have reach the probable end
             // in case of forming a syllable that starts in vowel.
-            let leftoverPointer = (pointerCalc() + reverseResult.length) === (word.length);
+            let leftoverPointer = leftoverCalc(reverseResult.length);
 
             //
             // === > Pushing the syllable that starts in vowel to global result array and skiping  the rest
@@ -327,7 +330,7 @@ class magikESpeller extends coreFunctionsExt {
             }
 
             // Same as previous example but for dipthongs
-            leftoverPointer = (pointerCalc() + probJointSyllable.length) + 2 === (word.length - 1);
+            leftoverPointer = leftoverCalc(probJointSyllable.length);
 
             //
             // === >  If an accent is found in any vowel in the dipthong, we treat it as a normal syllable and skip
