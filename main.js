@@ -58,7 +58,8 @@ class coreFunctions {
     // Given a word, returns it's structure (VOWEL + CONSONANT + VOWEL...)
     getEst(word, returnType = "string") {
 
-        let r = word.split("").map((a) => this.vowels.includes(this.clean(a)) ? "V" : "C");
+        word = this.clean(word)
+        let r = word.split("").map((a) => this.vowels.includes(a) ? "V" : "C");
         if (returnType === "string")
             return r.join("");
 
@@ -175,9 +176,9 @@ class magikESpeller extends coreFunctionsExt {
         //Check if latest push to sylables makes any sense and in case it doesn't, it fixes
         const rulesApply = (syllables) => {
 
-            const lastS = syllables.at(-1);
+            const lastS = syllables[syllables.length - 1];
             const lasSEst = this.getEst(lastS);
-            const lastLastS = syllables.at(-2) ?? false;
+            const lastLastS = syllables[syllables.length - 2] ?? false;
 
             if (!lastLastS) return syllables;
 
