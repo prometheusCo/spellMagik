@@ -14,17 +14,14 @@ class coreFunctions {
     approximants = ["b", "x"];
     vibrants = ["r", "rr"];
 
-
-    accents = ['á', 'é', 'í', 'ó', 'ú'];
-
     diphthongs = [
         "ia", "ie", "io", 'uei',
         "ua", "ue", "uo", "ió",
         "ai", "ei", "oi",
         "au", "eu", "ou",
         "iu", "ui", "ai",
-        "üi", "üe", "üa", "üe",
-        "üé", "eu", "uí", "üí"
+        "üi", "üe", "üa",
+        "üé", "uí", "üí"
     ];
 
     // Valid two-consonant ONSET clusters by SOUND TYPE 
@@ -41,9 +38,9 @@ class coreFunctions {
     valid2CSounds = [...this.validOnset2ByType, ...this.validCoda2ByType];
     diphthongsExceptions = ["uí", "üí"]
 
-    forbidenEnds = ["c", "k"];
+    forbiddenEnds = ["c", "k"];
 
-    forbidenEndsExc = [
+    forbiddenEndsExc = [
         "pec", "truc", "trac", "vic", "dic", "fec", "fac", "ac",
         "obs", "dac", "cons", "duc", "jec"
     ];
@@ -100,9 +97,10 @@ class coreFunctions {
     }
 
 }
-
+//
 //
 // Core methods extention
+//
 class coreFunctionsExt extends coreFunctions {
 
     constructor() { super(); }
@@ -148,7 +146,9 @@ class coreFunctionsExt extends coreFunctions {
     }
 }
 //
+//
 // Main class
+//
 class magikESpeller extends coreFunctionsExt {
 
     constructor() { super() }
@@ -160,7 +160,7 @@ class magikESpeller extends coreFunctionsExt {
         console.time("miScript");
         word = word.toLowerCase();
 
-        let syllables = []; // syllabes array, each position is a syllable
+        let syllables = []; // syllables array, each position is a syllable
         let syllablesTmp = ""; // tmp array used to store consonants bettwen found vowels
         let wordAsArray = word.split(""); // word given as an array of letters
         let wordAsEstArray = this.getEst(word, "array"); // word est (eje : CVC) also as array
@@ -170,17 +170,16 @@ class magikESpeller extends coreFunctionsExt {
         // This push what's stored in tmp + current letter to syllables's array last position
         const tmpPush = (currentLetter) => { syllables.push(syllablesTmp + currentLetter); syllablesTmp = ""; }
         // this checks if we have reached the end of the word and push wht's left in tmp to sayllables 
-        const emptyPush = (_pointerCalc) => { if (_pointerCalc === wordAsArray.length - 1) { tmpPush("") }; }
+        const emptyPush = () => tmpPush("");
 
         //Check if latest push to sylables makes any sense and in case it doesn't, it fixes
-        const rulesApply = (syllabes) => {
+        const rulesApply = (syllables) => {
 
-            const lastS = syllabes.at(-1);
+            const lastS = syllables.at(-1);
             const lasSEst = this.getEst(lastS);
+            const lastLastS = syllables.at(-2) ?? false;
 
-            const lastLastS = syllabes.at(-2) ?? false;
-
-            if (!lastLastS) return syllabes;
+            if (!lastLastS) return syllables;
 
             const lastLetterLastlastS = lastLastS[lastLastS.length - 1];
             const firstLastS = lastS.slice(0, 1);
@@ -195,25 +194,25 @@ class magikESpeller extends coreFunctionsExt {
             // and first from current form a diphthong e join them together
             //
             if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongs, true)))
-                this.moveAround(syllabes, syllabes.length - 1, lastS, "left");
+                this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
             //We check if there's a invalid 2 consonants syllable and fix it
             if (lasSEst.slice(0, 2) === "CC" && !this.isF2Valid(lastS)) {
 
                 if (lastS == "ch" || lastS == "ll") {
-                    syllabes[syllabes.length - 2] = syllabes[syllabes.length - 2] + lastS;
-                    syllabes.pop();
-                    return syllabes;
+                    syllables[syllables.length - 2] = syllables[syllables.length - 2] + lastS;
+                    syllables.pop();
+                    return syllables;
                 }
-                this.moveAround(syllabes, syllabes.length - 1, firstLastS, "left");
+                this.moveAround(syllables, syllables.length - 1, firstLastS, "left");
             }
 
             //Fixing invalid syllables endings
-            if (this.forbidenEnds.includes(lastLetterLastlastS) && !this.forbidenEndsExc.includes(this.clean(lastLastS)))
-                this.moveAround(syllabes, syllabes.length - 2, lastLetterLastlastS, "right");
+            if (this.forbiddenEnds.includes(lastLetterLastlastS) && !this.forbiddenEndsExc.includes(this.clean(lastLastS)))
+                this.moveAround(syllables, syllables.length - 2, lastLetterLastlastS, "right");
 
             //Sanity check
-            return syllabes.filter((s) => s !== "");
+            return syllables.filter((s) => s !== "");
         }
         //
         // Main method loop
@@ -221,15 +220,16 @@ class magikESpeller extends coreFunctionsExt {
         // saves it to syllables array, adding what's stored in tmp before it
         // it has rules to handle dipthongs and syllables that starts in vowel and end in consonant
         //
-        for (let index = 0; index < wordAsArray.length; index++) {
+        const end = wordAsArray.length - 1;
+        for (let index = 0; index <= end; index++) {
 
             const currentType = wordAsEstArray[index];
             const currentLetter = wordAsArray[index];
-            const pointerCalc = () => syllables.join("").length + syllablesTmp.length - 1;
 
             if (currentType === "C") {
 
-                tmpAdd(currentLetter); emptyPush(pointerCalc());
+                tmpAdd(currentLetter);
+                if (index === end) emptyPush();
                 syllables.length > 0 ? syllables = [...rulesApply(syllables)] : null;
                 continue;
             }
