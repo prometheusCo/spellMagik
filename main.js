@@ -48,9 +48,6 @@ class coreFunctions {
     //
     //Simple one liners helpers
     clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
-    isCapitalized = word => /^[A-ZÁÉÍÓÚÑÜ]/.test(word);
-    capitalize = s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-    hasAccent(vowel) { return this.accents.includes(vowel); }
     pos = n => n < 0 ? n * (-1) : n;
     //
     // Given a word, returns it's structure (VOWEL + CONSONANT + VOWEL...)
@@ -150,7 +147,11 @@ class coreFunctionsExt extends coreFunctions {
 //
 class magikESpeller extends coreFunctionsExt {
 
-    constructor() { super() }
+    constructor() {
+        super();
+        //avoiding user's cold start
+        this.splitInSyllables("produccionando")
+    }
     //  
     //Heuristic syllables spliter
     //
@@ -175,12 +176,12 @@ class magikESpeller extends coreFunctionsExt {
         const rulesApply = (syllables) => {
 
             const lastS = syllables[syllables.length - 1];
-            const lasSEst = this.getEst(lastS);
             const lastLastS = syllables[syllables.length - 2] ?? false;
 
             if (!lastLastS) return syllables;
 
             const lastLetterLastlastS = lastLastS[lastLastS.length - 1];
+            const lasSEst = this.getEst(lastS);
             const firstLastS = lastS.slice(0, 1);
             const firstLetLastEst = this.getEst(firstLastS)
 
@@ -192,8 +193,7 @@ class magikESpeller extends coreFunctionsExt {
             // No syllable can be made of a consonant only If last letter from  prev syllable 
             // and first from current form a diphthong e join them together
             //
-            if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongs, true)))
-                this.moveAround(syllables, syllables.length - 1, lastS, "left");
+
 
             //We check if there's a invalid 2 consonants syllable and fix it
             if (lasSEst.slice(0, 2) === "CC" && !this.isF2Valid(lastS)) {
@@ -210,9 +210,14 @@ class magikESpeller extends coreFunctionsExt {
             if (this.forbiddenEnds.includes(lastLetterLastlastS) && !this.forbiddenEndsExc.includes(this.clean(lastLastS)))
                 this.moveAround(syllables, syllables.length - 2, lastLetterLastlastS, "right");
 
+
+            if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongs, true)))
+                this.moveAround(syllables, syllables.length - 1, lastS, "left");
+
             //Sanity check
             return syllables.filter((s) => s !== "");
         }
+
         //
         // Main method loop
         // Iterates each letter, if its a consonant, stores it in tmp array, if it's a vowel
