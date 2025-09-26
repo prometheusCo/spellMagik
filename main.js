@@ -24,10 +24,10 @@ class coreFunctions {
         "au", "eu", "ou",
         "iu", "ui", "ai",
         "üi", "üe", "üa", "üe",
-        "üé", "eu", "uí"
+        "üé", "eu", "uí", "üí"
     ];
 
-    // Valid two-consonant ONSET clusters by TYPE 
+    // Valid two-consonant ONSET clusters by SOUND TYPE 
     validOnset2ByType = [
         "PCLC", // pl, bl, cl, gl
         "PCVC", // pr, br, tr, dr, cr, gr
@@ -41,11 +41,11 @@ class coreFunctions {
     valid2CSounds = [...this.validOnset2ByType, ...this.validCoda2ByType];
     diphthongsExceptions = ["uí", "üí"]
 
-    forbidenEnds = ["c", "k"]
+    forbidenEnds = ["c", "k"];
+
     forbidenEndsExc = [
         "pec", "truc", "trac", "vic", "dic", "fec", "fac", "ac",
-        "obs", "dac", "cons"
-
+        "obs", "dac", "cons", "duc", "jec"
     ];
 
     constructor() { };
@@ -57,7 +57,6 @@ class coreFunctions {
     capitalize = s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
     hasAccent(vowel) { return this.accents.includes(vowel); }
     pos = n => n < 0 ? n * (-1) : n;
-
     //
     // Given a word, returns it's structure (VOWEL + CONSONANT + VOWEL...)
     getEst(word, returnType = "string") {
@@ -68,7 +67,6 @@ class coreFunctions {
 
         return r;
     }
-
     //
     // this checks for any kind of invalid input
     isValid(val) {
@@ -76,7 +74,6 @@ class coreFunctions {
             return false;
         return true;
     }
-
     //
     // Reverse array search
     reverseSearch(word, array, loose = false) {
@@ -89,20 +86,16 @@ class coreFunctions {
         })
         return r;
     }
-
     //
     // Move chars backwards/forward bettwen array's positions
     moveAround(arr, pos, char, direction) {
 
         const to = direction === "right" ? pos + 1 : pos - 1;
         const cutIndex = direction === "right" ? -1 : 1;
-
         // cut char from current slot
         arr[pos] = direction === "right" ? arr[pos].slice(0, cutIndex) : arr[pos].slice(cutIndex);
-
         // glue char to neighbor
         arr[to] = direction === "right" ? char + arr[to] : arr[to] + char;
-
         return arr;
     }
 
@@ -113,7 +106,6 @@ class coreFunctions {
 class coreFunctionsExt extends coreFunctions {
 
     constructor() { super(); }
-
     //
     // Given a word, returns it's structure (VOWEL + CONSONANT + VOWEL...) BUT WITH THE TYPE OF CONSONANT SPECIFIED
     getEstExt(word, returnType = "array") {
@@ -138,12 +130,9 @@ class coreFunctionsExt extends coreFunctions {
 
             return "C";
         });
-
         if (returnType !== "array") return r.join("");
-
         return r;
     }
-
     //
     //
     isF2Valid(word) {
@@ -158,14 +147,11 @@ class coreFunctionsExt extends coreFunctions {
         return this.valid2CSounds.includes(est);
     }
 }
-
 //
 // Main class
 class magikESpeller extends coreFunctionsExt {
 
-
     constructor() { super() }
-
     //  
     //Heuristic syllables spliter
     splitInSyllables(word) {
@@ -180,16 +166,15 @@ class magikESpeller extends coreFunctionsExt {
 
         // This adds a letter to tmp array
         const tmpAdd = (currentLetter) => { syllablesTmp += currentLetter; }
-
         // This push what's stored in tmp + current letter to syllables's array last position
         const tmpPush = (currentLetter) => { syllables.push(syllablesTmp + currentLetter); syllablesTmp = ""; }
-
         // this checks if we have reached the end of the word and push wht's left in tmp to sayllables 
         const emptyPush = (_pointerCalc) => { if (_pointerCalc === wordAsArray.length - 1) { tmpPush("") }; }
 
         //Check if latest push to sylables makes any sense and in case it doesn't, it fixes
         const rulesApply = (syllabes) => {
 
+            console.log("entry ===> " + syllabes.join("-"));
             const lastS = syllabes.at(-1);
             const lasSEst = this.getEst(lastS);
 
@@ -231,14 +216,12 @@ class magikESpeller extends coreFunctionsExt {
             //Sanity check
             return syllabes.filter((s) => s !== "");
         }
-
         //
         // Main method loop
         // Iterates each letter, if its a consonant, stores it in tmp array, if it's a vowel
         // saves it to syllables array, adding what's stored in tmp before it
         // it has rules to handle dipthongs and syllables that starts in vowel and end in consonant
         //
-
         for (let index = 0; index < wordAsArray.length; index++) {
 
             const currentType = wordAsEstArray[index];
