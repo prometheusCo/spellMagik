@@ -213,7 +213,6 @@ class magikESpeller {
             syllables[syllables.length - 1] = syllables.at(-1).replaceAll("undefined", "");
             let r = lastCharCheck(syllables).filter((s) => s !== "");
 
-            console.log(r);
             for (let x = 0; x < 2; x++) {
 
                 r.forEach((syllable, index) => {
@@ -277,6 +276,7 @@ class magikESpeller {
 
             // This prevents adding again already added letters to syllables array when the pointer is moved forward 
             // after a dipthong or a syllable that starts in vowel is found
+
             if (index <= pointerCalc())
                 continue;
 
@@ -373,6 +373,9 @@ class magikESpeller {
                 emptyPush(pointerCalc());
                 continue;
             }
+
+            if (probJointSyllable.length === 3)
+                nextNextLetter = wordAsArray[index + 3] ?? "";
 
             !leftoverPointer ? probJointSyllable += nextNextLetter : probJointSyllable;
 
