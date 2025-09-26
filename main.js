@@ -42,6 +42,10 @@ class coreFunctions {
         "pr", "br", "cr", "fr", "gr"
     ]
 
+    validJoints = ["bs", "ns", "nd", "rs"];
+
+    invalidEnds = ["ch", "ll"]
+
     constructor() { };
 
     clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
@@ -49,6 +53,13 @@ class coreFunctions {
     isCapitalized = word => /^[A-ZÁÉÍÓÚÑÜ]/.test(word);
 
     capitalize = s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+
+    pos = n => n < 0 ? n * (-1) : n;
+
+    insertAfterIndex(arr, index, value) {
+        arr.splice(index + 1, 0, value);   // mutates arr
+        return arr;
+    }
 
     //
     // Given a word, returns it's structure (VOWEL + CONSONANT + VOWEL...)
@@ -75,7 +86,7 @@ class coreFunctions {
 
         let r = false;
         array.some((a) => {
-            if ((word.indexOf(a) >= 0 && loose) || (word === a)) {
+            if ((word.indexOf(a) >= 0 && loose && this.pos(a.length - word.length) <= 1) || (word === a)) {
                 r = a; return true;
             }
         })
@@ -142,23 +153,23 @@ class magikESpeller {
         this.reverseSearch = this.coreF.reverseSearch;
         this.syllablesThatStartsWithVowel = this.coreF.syllablesThatStartsWithVowel;
         this.diphthongs = this.coreF.diphthongs;
+        this.validJoints = this.coreF.validJoints;
         this.accents = this.coreF.accents;
         this.hasAccent = this.coreF.hasAccent;
         this.clean = this.coreF.clean;
         this.isCapitalized = this.coreF.isCapitalized;
         this.capitalize = this.coreF.capitalize;
         this.diphthongsExceptions = this.coreF.diphthongsExceptions;
-
-
+        this.pos = this.coreF.pos;
+        this.insertAfterIndex = this.coreF.insertAfterIndex;
         this.coreFunctionsExt = new coreFunctionsExt();
         this.getEstExt = this.coreFunctionsExt.getEstExt;
-
         this.vowels = this.coreF.vowels;
         this.consonantsS = this.coreF.consonantsS;
         this.consonantsF = this.coreF.consonantsF;
         this.consonantsL = this.coreF.consonantsL;
+        this.invalidEnds = this.coreF.invalidEnds;
         this.validSyllablesEst = this.coreF.validSyllablesEst;
-
         this.isValidSyllablesEst = this.coreFunctionsExt.isValidSyllablesEst;
     }
 
@@ -178,10 +189,13 @@ class magikESpeller {
 
         // This adds a letter to tmp array
         const tmpAdd = (currentLetter) => { syllablesTmp += currentLetter; }
+
         // This push what's stored in tmp + current letter to syllables's array last position
         const tmpPush = (currentLetter) => { syllables.push(syllablesTmp + currentLetter); syllablesTmp = ""; }
+
         // this checks if we have reached the end of the word and push wht's left in tmp to sayllables 
         const emptyPush = (_pointerCalc) => { if (_pointerCalc === wordAsArray.length - 1) { tmpPush("") }; }
+
         // this fixes some problems with last chars 
         const lastCharCheck = (_syllables) => {
 
@@ -199,6 +213,7 @@ class magikESpeller {
             syllables[syllables.length - 1] = syllables.at(-1).replaceAll("undefined", "");
             let r = lastCharCheck(syllables).filter((s) => s !== "");
 
+            console.log(r);
             for (let x = 0; x < 2; x++) {
 
                 r.forEach((syllable, index) => {
@@ -215,17 +230,11 @@ class magikESpeller {
                     let isValidEst = this.isValidSyllablesEst([this.getEstExt(syllable).join("")], [syllable]);
                     let isValidEstVar1 = this.isValidSyllablesEst([this.getEstExt(syllable.slice(1)).join("")], [syllable]);
 
-                    if (!isValidEst && isValidEstVar1) {
+                    if (!isValidEst && isValidEstVar1 ||
+                        (this.reverseSearch(prevLetter + syllable.slice(0, 1), this.validJoints) && !isValidEst)) {
 
                         r[index] = syllable.slice(1);
                         r[index - 1] = r[index - 1] + syllable.slice(0, 1);
-                        return;
-                    }
-
-                    if (prevPrevLetter + syllable.slice(0, 1) === "ers") {
-
-                        r[index] = syllable.slice(1)
-                        r[index - 1] = r[index - 1].slice(0, 1) + (prevPrevLetter + syllable.slice(0, 1));
                         return;
                     }
 
@@ -236,11 +245,15 @@ class magikESpeller {
 
                     r[index] = prevLetter + syllable;
                     r[index - 1] = prevSyllable.slice(0, prevSyllable.length - cutIndex);
-
                 })
-
             }
+
             r = r.filter((s) => s !== "");
+
+            if (this.invalidEnds.includes(r.at(-1))) {
+                r[r.length - 2] = r[r.length - 2] + r.at(-1); r.pop();
+            }
+
             return r;
         }
 
@@ -303,7 +316,7 @@ class magikESpeller {
             // === > Early negative return for cases in wich no dipthong or syllable that starts in vowel is found
             // in those cases we added this vowel to the syllables array prepending current tmp data and skip 
             //
-            if ((!probJointSyllable && !reverseResult) && !probJointSyllable) {
+            if ((!probJointSyllable && !reverseResult)) {
 
                 if (nextLetter === nextNextLetter && nextLetter !== "l" && nextLetter !== "r")
                     currentLetter += nextNextLetter;
@@ -329,7 +342,15 @@ class magikESpeller {
 
                 if (leftoverPointer)
                     reverseResult = reverseResult.slice(0, reverseResult.length - 1)
-                tmpPush(reverseResult); continue;
+
+                if (reverseResult[0] !== currentLetter)
+                    reverseResult = currentLetter + reverseResult;
+
+                if ((this.getEst(reverseResult) === "VVC") && !this.reverseSearch(reverseResult, this.diphthongs, true))
+                    reverseResult = reverseResult.slice(0, 1)
+
+                tmpPush(reverseResult);
+                continue;
             }
 
             // Same as previous example but for dipthongs
