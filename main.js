@@ -172,7 +172,7 @@ class magikESpeller extends coreFunctionsExt {
         // this checks if we have reached the end of the word and push wht's left in tmp to sayllables 
         const emptyPush = () => tmpPush("");
 
-        //Check if latest push to sylables makes any sense and in case it doesn't, it fixes
+        //Check if latest push to sylables makes any sense and in case it doesn't, it fixes it
         const rulesApply = (syllables) => {
 
             const lastS = syllables[syllables.length - 1];
