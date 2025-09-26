@@ -45,8 +45,6 @@ class coreFunctions {
         "obs", "dac", "cons", "duc", "jec"
     ];
 
-    constructor() { };
-
     //
     //Simple one liners helpers
     clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
