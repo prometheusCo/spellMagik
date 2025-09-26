@@ -42,9 +42,9 @@ class coreFunctions {
         "pr", "br", "cr", "fr", "gr"
     ]
 
-    validJoints = ["bs", "ns", "nd", "rs", "ll"];
+    validJoints = ["bs", "ns", "nd", "rs", "ll", "si"];
 
-    invalidEnds = ["ch", "ll"]
+    invalidEnds = ["ch", "ll", "im"]
 
     constructor() { };
 
@@ -192,6 +192,8 @@ class magikESpeller extends coreFunctionsExt {
                 r.forEach((syllable, index) => {
 
                     let prevSyllable = r[index - 1] ?? false;
+                    let nextSyllable = r[index + 1] ?? false;
+
                     if (!prevSyllable)
                         return;
 
@@ -202,22 +204,35 @@ class magikESpeller extends coreFunctionsExt {
                     let cutIndex = 1;
                     let isValidEst = this.isValidSyllablesEst([this.getEstExt(syllable).join("")], [syllable]);
                     let isValidEstVar1 = this.isValidSyllablesEst([this.getEstExt(syllable.slice(1)).join("")], [syllable]);
+                    let currentLetter = syllable.slice(0, 1);
+
 
                     if (!isValidEst && isValidEstVar1 ||
-                        (this.reverseSearch(prevLetter + syllable.slice(0, 1), this.validJoints) && !isValidEst)) {
+                        (!!this.reverseSearch(prevLetter + syllable.slice(0, 1), this.validJoints) && !isValidEst)) {
+
+                        if (syllable === "ión") {
+
+                            r[index] = prevLetter + syllable;
+                            r[index - 1] = r[index - 1].slice(0, r[index - 1].length - 1);
+                            return;
+                        }
+
 
                         r[index] = syllable.slice(1);
-                        r[index - 1] = r[index - 1] + syllable.slice(0, 1);
+                        r[index - 1] = r[index - 1] + currentLetter;
                         return;
                     }
 
-                    if (!this.diphthongs.includes(syllable) && prevSyllableEst + syllabeEst !== "CV" && prevSyllableEst + syllabeEst !== "CVC" && (prevLetter + syllable.slice(0, 1) !== "rr"))
+                    if (!this.diphthongs.includes(syllable) && prevSyllableEst + syllabeEst !== "CV" &&
+                        prevSyllableEst + syllabeEst !== "CVC" && (prevLetter + syllable.slice(0, 1) !== "rr"))
                         return;
 
                     if (prevPrevLetter === "rr") { prevLetter = "rr"; cutIndex = 2; }
+                    if (prevPrevLetter === "ll") { prevLetter = "ll"; cutIndex = 2; }
 
                     r[index] = prevLetter + syllable;
                     r[index - 1] = prevSyllable.slice(0, prevSyllable.length - cutIndex);
+
                 })
             }
 
@@ -296,7 +311,6 @@ class magikESpeller extends coreFunctionsExt {
 
                 if (nextLetter === nextNextLetter && nextLetter !== "l" && nextLetter !== "r")
                     currentLetter += nextNextLetter;
-
 
                 if (this.getEst(nextLetter) === "C" && this.getEst(nextNextLetter) === "C" &&
                     this.getEst(prevLetter) !== "V" && nextLetter !== nextNextLetter &&
