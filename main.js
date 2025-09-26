@@ -142,37 +142,10 @@ class coreFunctionsExt extends coreFunctions {
 
 //
 // Main class
-class magikESpeller {
+class magikESpeller extends coreFunctionsExt {
 
 
-    constructor() {
-
-        this.coreF = new coreFunctions();
-        this.getEst = this.coreF.getEst;
-        this.isValid = this.coreF.isValid;
-        this.reverseSearch = this.coreF.reverseSearch;
-        this.syllablesThatStartsWithVowel = this.coreF.syllablesThatStartsWithVowel;
-        this.diphthongs = this.coreF.diphthongs;
-        this.validJoints = this.coreF.validJoints;
-        this.accents = this.coreF.accents;
-        this.hasAccent = this.coreF.hasAccent;
-        this.clean = this.coreF.clean;
-        this.isCapitalized = this.coreF.isCapitalized;
-        this.capitalize = this.coreF.capitalize;
-        this.diphthongsExceptions = this.coreF.diphthongsExceptions;
-        this.pos = this.coreF.pos;
-        this.insertAfterIndex = this.coreF.insertAfterIndex;
-        this.coreFunctionsExt = new coreFunctionsExt();
-        this.getEstExt = this.coreFunctionsExt.getEstExt;
-        this.vowels = this.coreF.vowels;
-        this.consonantsS = this.coreF.consonantsS;
-        this.consonantsF = this.coreF.consonantsF;
-        this.consonantsL = this.coreF.consonantsL;
-        this.invalidEnds = this.coreF.invalidEnds;
-        this.validSyllablesEst = this.coreF.validSyllablesEst;
-        this.isValidSyllablesEst = this.coreFunctionsExt.isValidSyllablesEst;
-    }
-
+    constructor() { super() }
     //  
     //Heuristic syllables spliter
     splitInSyllables(word) {
@@ -268,7 +241,7 @@ class magikESpeller {
                 currentLetter = wordAsArray[index],
                 currentType = wordAsEstArray[index],
                 nextLetter = wordAsArray[index + 1] ?? false,
-                prevLetter = wordAsArray[index + 1] ?? false,
+                prevLetter = wordAsArray[index - 1] ?? "",
                 nextNextLetter = wordAsArray[index + 2] ?? "",
                 pointerCalc = () => syllables.join("").length + syllablesTmp.length - 1;
             // code above calcs current pointer
@@ -322,7 +295,7 @@ class magikESpeller {
                     currentLetter += nextNextLetter;
 
 
-                if (prevLetter !== false && this.getEst(nextLetter) === "C" && this.getEst(nextNextLetter) === "C" &&
+                if (this.getEst(nextLetter) === "C" && this.getEst(nextNextLetter) === "C" &&
                     this.getEst(prevLetter) !== "V" && nextLetter !== nextNextLetter &&
                     !this.validSyllablesEst.includes(nextLetter + nextNextLetter))
                     currentLetter += nextLetter;
