@@ -219,7 +219,7 @@ class magikESpeller extends coreFunctionsExt {
         // Main method loop
         // Iterates each letter, if its a consonant, stores it in tmp array, if it's a vowel
         // saves it to syllables array, adding what's stored in tmp before it
-        // it has rules to handle dipthongs and syllables that starts in vowel and end in consonant
+        // it has rules to handle dipthongs and syllables that starts in vowel and end in consonant, etc...
         //
         const end = wordAsArray.length - 1;
         for (let index = 0; index <= end; index++) {
