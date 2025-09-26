@@ -229,12 +229,12 @@ class magikESpeller extends coreFunctionsExt {
 
                 tmpAdd(currentLetter);
                 if (index === end) emptyPush();
-                syllables.length > 0 ? syllables = [...rulesApply(syllables)] : null;
+                syllables.length > 0 ? syllables = rulesApply(syllables) : null;
                 continue;
             }
 
             tmpPush(currentLetter);
-            syllables = [...rulesApply(syllables)];
+            syllables = rulesApply(syllables);
         }
 
         console.timeEnd("miScript");
