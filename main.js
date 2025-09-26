@@ -154,6 +154,7 @@ class magikESpeller extends coreFunctionsExt {
     constructor() { super() }
     //  
     //Heuristic syllables spliter
+    //
     splitInSyllables(word) {
 
         console.time("miScript");
@@ -174,7 +175,6 @@ class magikESpeller extends coreFunctionsExt {
         //Check if latest push to sylables makes any sense and in case it doesn't, it fixes
         const rulesApply = (syllabes) => {
 
-            console.log("entry ===> " + syllabes.join("-"));
             const lastS = syllabes.at(-1);
             const lasSEst = this.getEst(lastS);
 
@@ -183,7 +183,6 @@ class magikESpeller extends coreFunctionsExt {
             if (!lastLastS) return syllabes;
 
             const lastLetterLastlastS = lastLastS[lastLastS.length - 1];
-            const lastLastEst = this.getEst(lastLastS) ?? false;
             const firstLastS = lastS.slice(0, 1);
             const firstLetLastEst = this.getEst(firstLastS)
 
@@ -192,9 +191,9 @@ class magikESpeller extends coreFunctionsExt {
             //Sanity check
             if (conjuntion.length > 3) conjuntion = conjuntion.slice(-3);
 
-            // No syllable can be made of a consonant only
-            // If last letter from  prev syllable and first from current form a diphthong
-            // We join them together
+            // No syllable can be made of a consonant only If last letter from  prev syllable 
+            // and first from current form a diphthong e join them together
+            //
             if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongs, true)))
                 this.moveAround(syllabes, syllabes.length - 1, lastS, "left");
 
