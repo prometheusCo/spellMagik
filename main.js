@@ -157,7 +157,7 @@ class magikESpeller extends coreFunctionsExt {
     //
     splitInSyllables(word) {
 
-        console.time("miScript");
+        //console.time("miScript");
         word = word.toLowerCase();
 
         let syllables = []; // syllables array, each position is a syllable
@@ -190,11 +190,6 @@ class magikESpeller extends coreFunctionsExt {
             //Sanity check
             if (conjuntion.length > 3) conjuntion = conjuntion.slice(-3);
 
-            // No syllable can be made of a consonant only If last letter from  prev syllable 
-            // and first from current form a diphthong e join them together
-            //
-
-
             //We check if there's a invalid 2 consonants syllable and fix it
             if (lasSEst.slice(0, 2) === "CC" && !this.isF2Valid(lastS)) {
 
@@ -210,7 +205,9 @@ class magikESpeller extends coreFunctionsExt {
             if (this.forbiddenEnds.includes(lastLetterLastlastS) && !this.forbiddenEndsExc.includes(this.clean(lastLastS)))
                 this.moveAround(syllables, syllables.length - 2, lastLetterLastlastS, "right");
 
-
+            // No syllable can be made of 1 consonant only // If last letter from  prev syllable 
+            // and first from current form a diphthong we join them together
+            //
             if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongs, true)))
                 this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
@@ -241,8 +238,7 @@ class magikESpeller extends coreFunctionsExt {
             tmpPush(currentLetter);
             syllables = rulesApply(syllables);
         }
-
-        console.timeEnd("miScript");
+        //console.timeEnd("miScript");
         return rulesApply(syllables);
     }
 
