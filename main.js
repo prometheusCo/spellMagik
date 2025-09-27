@@ -1,19 +1,23 @@
 // Core utility methods
 class coreFunctions {
 
+    //
+    epochs = 10;
+
     // Vowels used to better clasification
-    vowelsOpened = ['a', 'e', 'o'];
-    vowelsClosed = ['i', 'u'];
-    vowels = [...this.vowelsOpened, ...this.vowelsClosed];
+    vowels = ['a', 'e', 'o', 'u', 'i'];
 
     // Consonants types  used for ruling out of syllables
-    plosives = ["p", "t", "k", "b", "d", "g"];
-    fricatives = ["f", "s", "j", "z"];
-    affricates = ["ch"];
-    nasals = ["m", "n", "ñ"];
-    laterals = ["l", "ll"];
-    approximants = ["b", "x"];
-    vibrants = ["r", "rr"];
+    plosives = ["PC", "p", "t", "k", "b", "d", "g"];
+    fricatives = ["FC", "f", "s", "j", "z"];
+    affricates = ["AFC", "ch"];
+    nasals = ["NC", "m", "n", "ñ"];
+    laterals = ["LC", "l", "ll"];
+    approximants = ["AC", "b", "x"];
+    vibrants = ["BC", "r", "rr"];
+
+    consonantsTypes = ["PC", "FC", "AFC", "NC", "LC", "AC", "BC"]
+
 
     // Used to rule in valid vocals joins
     diphthongsAndtriphthongs = [
@@ -29,21 +33,27 @@ class coreFunctions {
     // Valid two-consonant ONSET clusters by consonant (sound) TYPE
     valid2CSounds = [
         "PCLC", // pl, bl, cl, gl
-        "PCVC", // pr, br, tr, dr, cr, gr
-        "FCVC", // fr
+        "PCBC", // pr, br, tr, dr, cr, gr
+        "FCBC", // fr
     ];
 
-    // Used to determine if a syllable is misspelled by looking at it's ending letters
-    invalidSyllablesEndings = ["k", "g", "c"];
 
+    // Used to determine if a syllable is misspelled by looking at it's ending letters
+    invalidSyllablesEndings = ["k", "g", "c", "x"];
+
+    invalidSyllablesEndingsExceptions = ["ac", "oc", "ec", "ic"]
     //
     // Simple one-liner helpers
     clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
     pos = n => n < 0 ? n * (-1) : n;
+    isValid = val => val !== undefined && val !== "" && val !== null && val !== "undefined";
+    replaceCharAt = (str, pos, char) => str.slice(0, pos) + char + str.slice(pos + 1);
+    splitArrayAt = (arr, pos) => [arr.slice(0, pos), arr.slice(pos)];
     //
     // Given a word, return its V/C structure (e.g., VOWEL + CONSONANT + VOWEL…)
     getEst(word, returnType = "string") {
 
+        if (!this.isValid(word)) return "";
         word = this.clean(word)
         let r = word.split("").map((a) => this.vowels.includes(a) ? "V" : "C");
         if (returnType === "string")
@@ -101,13 +111,13 @@ class coreFunctionsExt extends coreFunctions {
                 return "PC";
             }
 
-            if (this.plosives.includes(wordAsArray[index])) return "PC";
-            if (this.fricatives.includes(wordAsArray[index])) return "FC";
-            if (this.affricates.includes(wordAsArray[index])) return "CA";
-            if (this.nasals.includes(wordAsArray[index])) return "NC";
-            if (this.laterals.includes(wordAsArray[index])) return "LC";
-            if (this.approximants.includes(wordAsArray[index])) return "AC";
-            if (this.vibrants.includes(wordAsArray[index])) return "VC";
+            if (this.plosives.includes(wordAsArray[index])) return this.plosives[0];
+            if (this.fricatives.includes(wordAsArray[index])) return this.fricatives[0];
+            if (this.affricates.includes(wordAsArray[index])) return this.affricates[0];
+            if (this.nasals.includes(wordAsArray[index])) return this.nasals[0];
+            if (this.laterals.includes(wordAsArray[index])) return this.laterals[0];
+            if (this.approximants.includes(wordAsArray[index])) return this.approximants[0];
+            if (this.vibrants.includes(wordAsArray[index])) return this.vibrants[0];
 
             return "C";
         });
@@ -118,12 +128,22 @@ class coreFunctionsExt extends coreFunctions {
     // Validate first two letters (onset) against allowed clusters and exceptions
     isF2Valid(word) {
 
-        let f2 = word.slice(0, 2); let f3 = word.slice(0, 3); let est = this.getEstExt(f2, "str");
+        const isEst = (word[0] !== word[0].toLowerCase()) ? true : false;
+
+        let f2 = !isEst ? word.slice(0, 2) : "";
+        let f3 = !isEst ? word.slice(0, 3) : "";
+        let est = !isEst ? this.getEstExt(f2, "str") : word.slice(0, 4);
+        let estS = !isEst ? this.getEst(word, "string").slice(0, 2) : word;
+
+        console.log(est + " " + estS);
+        // Early return for easy cases
+        if (estS === "CV" || estS == "VC")
+            return true;
         // If first 2 letters starts in forbiden chars or full word is a 2 chars forbiden type, then we return false
         if (f2 === "cc" || word === "ch" || word === "rr" || word === "ll")
             return false;
         // If first 2 chars are common spanish 2 letters formed sounds or know 3 chars exceptions, then we return true
-        if (((f2 === "rr" || f2 === "ll" || est === "CV" || f2 == "ch" || f2 === "ps") && word.length > 2) || f3 === "ciu" || f3 === "cie")
+        if (((f2 === "rr" || f2 === "ll" || f2 == "ch" || f2 === "ps") && word.length > 2) || f3 === "ciu" || f3 === "cie")
             return true;
         // Otherwise we  test the current sound patter to those allowed in spanish (for the firs 2C)
         return this.valid2CSounds.includes(est);
@@ -132,7 +152,7 @@ class coreFunctionsExt extends coreFunctions {
 
 //
 //
-// Main class
+// Syllabifier class
 //
 class Syllabifier extends coreFunctionsExt {
 
@@ -153,6 +173,7 @@ class Syllabifier extends coreFunctionsExt {
     //
     rulesApply = (syllables) => {
 
+        console.log("=>" + syllables);
         const lastS = syllables[syllables.length - 1];
         const lastLastS = syllables[syllables.length - 2] ?? false;
 
@@ -234,9 +255,6 @@ class Syllabifier extends coreFunctionsExt {
         return this.rulesApply(syllables);
     }
 
-
-
-
 }
 
 //
@@ -253,18 +271,53 @@ class magikEspellCheck extends Syllabifier {
     // structure, last char type or general structure of the syllable
     isValidSyllable(syllable) {
 
-        const syllableEst = this.getEst(syllable);
-        const syllableEnding = syllable.slice(syllable.length - 1);
+        let isEst;
+        try { isEst = (syllable[0] !== syllable[0].toLowerCase()) ? true : false; } catch (error) { return false; }
 
-        if (syllableEst === "CV")
-            return true;
-        if (syllableEst === "C" || this.invalidSyllablesEndings.includes(syllableEnding))
+        const syllableEst = !isEst ? this.getEst(syllable) : syllable.join("").replaceAll(/[A-B|D-U| W-Z]/g, "");
+        const syllableEnding = !isEst ? syllable.slice(syllable.length - 1) : "";
+        const f2l = !isEst ? syllable.slice(0, 2) : "";
+
+        if (syllableEst === "C")
             return false;
+
+        if (syllableEst === "V")
+            return true;
+
+        if ((syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" || syllableEst === "CVC")
+            && (!this.invalidSyllablesEndings.includes(syllableEnding) || this.invalidSyllablesEndingsExceptions.includes(syllable)))
+            return true;
 
         if (syllableEst === "CCC")
             return false;
 
-        return this.isF2Valid(syllable);
+        if (isEst) syllable = syllable.join("");
+        return this.isF2Valid(syllable)
+    }
+
+    //
+    //
+    generateVariations(entry, pool = [...this.consonantsTypes, ...["V"]], includeSame = true) {
+
+        const indices = [...entry.keys()];
+        const combos = (xs) =>
+            xs.reduce(
+                (acc, x) => acc.concat(acc.map(s => s.concat(x))),
+                [[]]
+            ).slice(1); // sin conjunto vacío
+
+        const optionsAt = i => (includeSame ? pool : pool.filter(t => t !== entry[i]));
+        const replaceAt = (arr, i, val) => arr.map((x, k) => (k === i ? val : x));
+        const cartesian = (arrays) =>
+            arrays.reduce((a, b) => a.flatMap(x => b.map(y => x.concat([y]))), [[]]);
+
+        let r = combos(indices).flatMap(idxs =>
+            cartesian(idxs.map(i => optionsAt(i))).map(tokens =>
+                idxs.reduce((acc, i, p) => replaceAt(acc, i, tokens[p]), entry)
+            )
+        );
+
+        return r.filter((v) => this.isValidSyllable(v));
     }
 
     //
@@ -272,7 +325,7 @@ class magikEspellCheck extends Syllabifier {
     mutate(word) {
 
         const syllables = super.splitInSyllables(word); // original syllables array
-        let syllablesMS = syllables; // Misspelled syllables
+        let syllablesMS = [...syllables]; // Misspelled syllables
         let mutations = new Map(); // Map with all mutations (is like using php asociatives arrays)
 
         // classifying misspelled syllables
@@ -283,21 +336,26 @@ class magikEspellCheck extends Syllabifier {
                 syllablesMS[index] = "";
         }
 
+        // Sanitation check
+        syllablesMS = syllablesMS.length === 1 ?
+            this.splitArrayAt(syllablesMS[0], syllablesMS[0].length / 2) : syllablesMS;
+
         // Generating mutations for each misspelled syllable
-        syllablesMS.forEach((sylms) => {
+        syllablesMS.forEach((sylms, index) => {
 
-            mutations.get(`${sylms}`) === undefined ?
-                mutations.set(`${sylms}`, []) : null;
+            if (!this.isValid(sylms))
+                return;
 
-            let mutations = this.generateProbMutations(sylms);
-            mutations.get(`${sylms}`).push(mutations);
+            !mutations.has(`${sylms}`) ? mutations.set(`${sylms}`, []) : null;
+
+            let _mutations = this.generateVariations(this.getEstExt(sylms));
+            mutations.get(`${sylms}`).push(_mutations);
 
         })
 
         console.log(mutations);
-
     }
 
 }
 
-const spell = new magikEspellCheck();
+const spell = new Syllabifier();
