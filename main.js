@@ -25,17 +25,13 @@ class coreFunctions {
     ];
 
     // Valid two-consonant ONSET clusters by SOUND TYPE 
-    validOnset2ByType = [
+    valid2CSounds = [
         "PCLC", // pl, bl, cl, gl
         "PCVC", // pr, br, tr, dr, cr, gr
         "FCLC", // fl
         "FCVC", // fr
     ];
 
-    // Valid two-consonant CODA clusters by TYPE 
-    validCoda2ByType = [];
-
-    valid2CSounds = [...this.validOnset2ByType, ...this.validCoda2ByType];
     diphthongsExceptions = ["uí", "üí"]
 
     forbiddenEnds = ["c", "k"];
