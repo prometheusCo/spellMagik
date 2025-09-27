@@ -158,7 +158,7 @@ class magikESpeller extends coreFunctionsExt {
 
         let syllables = []; // syllables array, each position is a syllable
         let syllablesTmp = ""; // tmp array used to store consonants bettwen found vowels
-        let wordAsArray = word.split(""); // word given as an array of letters
+        let wordAsArray = word.split(""); // given word as an array of letters
         let wordAsEstArray = this.getEst(word, "array"); // word est (eje : CVC) also as array
 
         // This adds a letter to tmp array
