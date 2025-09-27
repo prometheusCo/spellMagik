@@ -89,6 +89,7 @@ class coreFunctions {
     }
 
 }
+
 //
 //
 // Core methods extention
@@ -137,11 +138,12 @@ class coreFunctionsExt extends coreFunctions {
         return this.valid2CSounds.includes(est);
     }
 }
+
 //
 //
 // Main class
 //
-class magikESpeller extends coreFunctionsExt {
+class Syllabifyer extends coreFunctionsExt {
 
     constructor() {
         super();
@@ -243,4 +245,4 @@ class magikESpeller extends coreFunctionsExt {
 
 }
 
-const spell = new magikESpeller();
+const spell = new Syllabifyer();
