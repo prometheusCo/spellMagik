@@ -33,6 +33,9 @@ class coreFunctions {
         "FCVC", // fr
     ];
 
+    // Used to determine if a syllable is misspelled by looking at it's ending letters
+    invalidSyllablesEndings = ["k", "g", "c"];
+
     //
     // Simple one-liner helpers
     clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
@@ -116,12 +119,13 @@ class coreFunctionsExt extends coreFunctions {
     isF2Valid(word) {
 
         let f2 = word.slice(0, 2); let f3 = word.slice(0, 3); let est = this.getEstExt(f2, "str");
-
+        // If first 2 letters starts in forbiden chars or full word is a 2 chars forbiden type, then we return false
         if (f2 === "cc" || word === "ch" || word === "rr" || word === "ll")
             return false;
-        if (f2 === "rr" || f2 === "ll" || est === "CV" || f2 == "ch" || f2 === "ps" || f3 === "ciu" || f3 === "cie")
+        // If first 2 chars are common spanish 2 letters formed sounds or know 3 chars exceptions, then we return true
+        if (((f2 === "rr" || f2 === "ll" || est === "CV" || f2 == "ch" || f2 === "ps") && word.length > 2) || f3 === "ciu" || f3 === "cie")
             return true;
-
+        // Otherwise we  test the current sound patter to those allowed in spanish (for the firs 2C)
         return this.valid2CSounds.includes(est);
     }
 }
@@ -238,22 +242,62 @@ class Syllabifier extends coreFunctionsExt {
 //
 // Class extension to the main Syllabifyer class, focused on syllabifying misspelled words
 //
-class SyllabifierAdvanced extends Syllabifier {
+class magikEspellCheck extends Syllabifier {
 
     constructor() {
         super();
     }
 
+    //
+    // Detects whether a syllable is misspelled or not based on first 2 consonants,
+    // structure, last char type or general structure of the syllable
     isValidSyllable(syllable) {
 
-        const syllableEst = this.getEst(lastS);
+        const syllableEst = this.getEst(syllable);
+        const syllableEnding = syllable.slice(syllable.length - 1);
 
-        if (syllableEst === "C")
+        if (syllableEst === "CV")
+            return true;
+        if (syllableEst === "C" || this.invalidSyllablesEndings.includes(syllableEnding))
             return false;
 
-        SyllableHasValidEnding
+        if (syllableEst === "CCC")
+            return false;
+
+        return this.isF2Valid(syllable);
+    }
+
+    //
+    // Given a word, takes it's misspelled syllables and returns plausible variations for them
+    mutate(word) {
+
+        const syllables = super.splitInSyllables(word); // original syllables array
+        let syllablesMS = syllables; // Misspelled syllables
+        let mutations = new Map(); // Map with all mutations (is like using php asociatives arrays)
+
+        // classifying misspelled syllables
+        for (let index = 0; index < syllables.length; index++) {
+
+            const currentPos = syllables[index];
+            if (this.isValidSyllable(currentPos))
+                syllablesMS[index] = "";
+        }
+
+        // Generating mutations for each misspelled syllable
+        syllablesMS.forEach((sylms) => {
+
+            mutations.get(`${sylms}`) === undefined ?
+                mutations.set(`${sylms}`, []) : null;
+
+            let mutations = this.generateProbMutations(sylms);
+            mutations.get(`${sylms}`).push(mutations);
+
+        })
+
+        console.log(mutations);
+
     }
 
 }
 
-const spell = new Syllabifier();
+const spell = new magikEspellCheck();
