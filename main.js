@@ -30,17 +30,7 @@ class coreFunctions {
     valid2CSounds = [
         "PCLC", // pl, bl, cl, gl
         "PCVC", // pr, br, tr, dr, cr, gr
-        "FCLC", // fl
         "FCVC", // fr
-    ];
-
-    // Used to rule out syllables with invalind endings 
-    forbiddenEnds = ["c", "k"];
-
-    //Exceptions to rules above
-    forbiddenEndsExc = [
-        "pec", "truc", "trac", "vic", "dic", "fec", "fac", "ac",
-        "obs", "dac", "cons", "duc", "jec"
     ];
 
     //
@@ -158,7 +148,7 @@ class Syllabifier extends coreFunctionsExt {
     // Heuristic rules to help the main loop split into syllables more accurately
     //
     rulesApply = (syllables) => {
-        console.log(syllables);
+
         const lastS = syllables[syllables.length - 1];
         const lastLastS = syllables[syllables.length - 2] ?? false;
 
@@ -199,7 +189,7 @@ class Syllabifier extends coreFunctionsExt {
     //
     splitInSyllables(word) {
 
-        //console.time("miScript");
+        console.time("miScript");
         word = word.toLowerCase();
 
         let syllables = []; // Final syllables array; each element is one syllable
@@ -236,7 +226,7 @@ class Syllabifier extends coreFunctionsExt {
             tmpPush(currentLetter);
             syllables = this.rulesApply(syllables);
         }
-        //console.timeEnd("miScript");
+        console.timeEnd("miScript");
         return this.rulesApply(syllables);
     }
 
