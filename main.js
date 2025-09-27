@@ -184,7 +184,7 @@ class Syllabifyer extends coreFunctionsExt {
             this.moveAround(syllables, syllables.length - 2, lastLetterLastlastS, "right");
 
         // No syllable can be a single consonant.
-        // If last letter of previous + first of current form a diphthong, join them.
+        // If last letter of previous syllable + first of current syllable form a diphthong, join them.
         if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongsAndtriphthongs, true)))
             this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
