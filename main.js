@@ -140,7 +140,7 @@ class coreFunctionsExt extends coreFunctions {
 //
 // Main class
 //
-class Syllabifyer extends coreFunctionsExt {
+class Syllabifier extends coreFunctionsExt {
 
     constructor() {
         super();
@@ -148,11 +148,17 @@ class Syllabifyer extends coreFunctionsExt {
         this.splitInSyllables("produccionando")
     }
 
+    SyllableHasValidEnding(lastLetterLastlastS, lastLastS) {
+        if (this.forbiddenEnds.includes(lastLetterLastlastS) && !this.forbiddenEndsExc.includes(this.clean(lastLetterLastlastS)))
+            return false;
+        return true;
+    }
+
     //
     // Heuristic rules to help the main loop split into syllables more accurately
     //
     rulesApply = (syllables) => {
-
+        console.log(syllables);
         const lastS = syllables[syllables.length - 1];
         const lastLastS = syllables[syllables.length - 2] ?? false;
 
@@ -178,10 +184,6 @@ class Syllabifyer extends coreFunctionsExt {
             }
             this.moveAround(syllables, syllables.length - 1, firstLastS, "left");
         }
-
-        // Fix invalid syllable endings
-        if (this.forbiddenEnds.includes(lastLetterLastlastS) && !this.forbiddenEndsExc.includes(this.clean(lastLastS)))
-            this.moveAround(syllables, syllables.length - 2, lastLetterLastlastS, "right");
 
         // No syllable can be a single consonant.
         // If last letter of previous syllable + first of current syllable form a diphthong, join them.
@@ -238,6 +240,30 @@ class Syllabifyer extends coreFunctionsExt {
         return this.rulesApply(syllables);
     }
 
+
+
+
 }
 
-const spell = new Syllabifyer();
+//
+// Class extension to the main Syllabifyer class, focused on syllabifying misspelled words
+//
+class SyllabifierAdvanced extends Syllabifier {
+
+    constructor() {
+        super();
+    }
+
+    isValidSyllable(syllable) {
+
+        const syllableEst = this.getEst(lastS);
+
+        if (syllableEst === "C")
+            return false;
+
+        SyllableHasValidEnding
+    }
+
+}
+
+const spell = new Syllabifier();
