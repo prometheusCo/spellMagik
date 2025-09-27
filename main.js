@@ -2,7 +2,7 @@
 class coreFunctions {
 
     //
-    epochs = 10;
+    minSimilarity = 0.7;
 
     // Vowels used to better clasification
     vowels = ['a', 'e', 'o', 'u', 'i'];
@@ -16,7 +16,7 @@ class coreFunctions {
     approximants = ["AC", "b", "x"];
     vibrants = ["BC", "r", "rr"];
 
-    consonantsTypes = ["PC", "FC", "AFC", "NC", "LC", "AC", "BC"]
+    consonantsTypes = ["PC", "FC", "NC", "LC", "AC", "BC"]
 
 
     // Used to rule in valid vocals joins
@@ -35,6 +35,7 @@ class coreFunctions {
         "PCLC", // pl, bl, cl, gl
         "PCBC", // pr, br, tr, dr, cr, gr
         "FCBC", // fr
+        "FCLC",
     ];
 
 
@@ -61,6 +62,46 @@ class coreFunctions {
 
         return r;
     }
+    //
+    //
+
+    diffScoreStrings(a, b, weights = { ins: 0.7, del: 1.3, sub: 1.0 }) {
+
+        const m = a.length;
+        const n = b.length;
+
+        // DP optimizado a 2 filas
+        const [s, t] = m < n ? [a, b] : [b, a];
+        const rows = s.length + 1;
+        const cols = t.length + 1;
+
+        let prev = new Float32Array(cols);
+        let curr = new Float32Array(cols);
+
+        for (let j = 0; j < cols; j++) prev[j] = j * weights.ins;
+
+        for (let i = 1; i < rows; i++) {
+            curr[0] = i * weights.del;
+            const si = s.charCodeAt(i - 1);
+            for (let j = 1; j < cols; j++) {
+                const tj = t.charCodeAt(j - 1);
+                const cost = si === tj ? 0 : weights.sub;
+                const del = prev[j] + weights.del;
+                const ins = curr[j - 1] + weights.ins;
+                const sub = prev[j - 1] + cost;
+                curr[j] = Math.min(del, ins, sub);
+            }
+            [prev, curr] = [curr, prev];
+        }
+
+        const distance = prev[cols - 1];
+        const maxLen = Math.max(m, n) || 1;
+        const worst = maxLen * Math.max(weights.ins, weights.del, weights.sub);
+
+        const similarity = 1 - distance / worst;
+        return 0.1 + similarity * 0.89; // escala 0.1–0.99
+    }
+
     //
     // Try to find a match for a `word` inside an `array`. If `loose` is false → only exact matches are found
     // if `loose` is true → near matches are allow . Returns the first matching element, or `false`.
@@ -135,7 +176,6 @@ class coreFunctionsExt extends coreFunctions {
         let est = !isEst ? this.getEstExt(f2, "str") : word.slice(0, 4);
         let estS = !isEst ? this.getEst(word, "string").slice(0, 2) : word;
 
-        console.log(est + " " + estS);
         // Early return for easy cases
         if (estS === "CV" || estS == "VC")
             return true;
@@ -173,7 +213,6 @@ class Syllabifier extends coreFunctionsExt {
     //
     rulesApply = (syllables) => {
 
-        console.log("=>" + syllables);
         const lastS = syllables[syllables.length - 1];
         const lastLastS = syllables[syllables.length - 2] ?? false;
 
@@ -214,7 +253,6 @@ class Syllabifier extends coreFunctionsExt {
     //
     splitInSyllables(word) {
 
-        console.time("miScript");
         word = word.toLowerCase();
 
         let syllables = []; // Final syllables array; each element is one syllable
@@ -251,7 +289,6 @@ class Syllabifier extends coreFunctionsExt {
             tmpPush(currentLetter);
             syllables = this.rulesApply(syllables);
         }
-        console.timeEnd("miScript");
         return this.rulesApply(syllables);
     }
 
@@ -278,18 +315,24 @@ class magikEspellCheck extends Syllabifier {
         const syllableEnding = !isEst ? syllable.slice(syllable.length - 1) : "";
         const f2l = !isEst ? syllable.slice(0, 2) : "";
 
+
         if (syllableEst === "C")
             return false;
 
         if (syllableEst === "V")
             return true;
 
+        if (syllableEst.slice(0, 3) === "CCC")
+            return false;
+
+
+        if (isEst && syllable.at(-1) === "AFC")
+            return false;
+
         if ((syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" || syllableEst === "CVC")
             && (!this.invalidSyllablesEndings.includes(syllableEnding) || this.invalidSyllablesEndingsExceptions.includes(syllable)))
             return true;
 
-        if (syllableEst === "CCC")
-            return false;
 
         if (isEst) syllable = syllable.join("");
         return this.isF2Valid(syllable)
@@ -297,14 +340,15 @@ class magikEspellCheck extends Syllabifier {
 
     //
     //
-    generateVariations(entry, pool = [...this.consonantsTypes, ...["V"]], includeSame = true) {
+    generateVariations(entry, pool = [...this.consonantsTypes, ...["V"]], includeSame = false) {
 
+        const entryAsStrt = entry.join("");
         const indices = [...entry.keys()];
         const combos = (xs) =>
             xs.reduce(
                 (acc, x) => acc.concat(acc.map(s => s.concat(x))),
                 [[]]
-            ).slice(1); // sin conjunto vacío
+            ).slice(1); // empty cluster filtering
 
         const optionsAt = i => (includeSame ? pool : pool.filter(t => t !== entry[i]));
         const replaceAt = (arr, i, val) => arr.map((x, k) => (k === i ? val : x));
@@ -317,12 +361,14 @@ class magikEspellCheck extends Syllabifier {
             )
         );
 
-        return r.filter((v) => this.isValidSyllable(v));
+        r = r.filter((v) => this.isValidSyllable(v));
+        return r;
     }
 
     //
     // Given a word, takes it's misspelled syllables and returns plausible variations for them
     mutate(word) {
+        const start = performance.now();
 
         const syllables = super.splitInSyllables(word); // original syllables array
         let syllablesMS = [...syllables]; // Misspelled syllables
@@ -337,8 +383,8 @@ class magikEspellCheck extends Syllabifier {
         }
 
         // Sanitation check
-        syllablesMS = syllablesMS.length === 1 ?
-            this.splitArrayAt(syllablesMS[0], syllablesMS[0].length / 2) : syllablesMS;
+        syllablesMS = syllablesMS.length === 1 || syllablesMS.at(-1).length === 1 ?
+            this.splitArrayAt(syllables.join(""), syllables.join("").length / 2) : syllablesMS;
 
         // Generating mutations for each misspelled syllable
         syllablesMS.forEach((sylms, index) => {
@@ -353,9 +399,20 @@ class magikEspellCheck extends Syllabifier {
 
         })
 
+        syllablesMS.forEach((sylms, index) => {
+
+
+        });
+
+
+        console.timeEnd("miScript");
+        const end = performance.now();
+        const seconds = (end - start) / 1000;
+
+        console.log("miScript:", seconds.toFixed(3), " segs");
         console.log(mutations);
     }
 
 }
 
-const spell = new Syllabifier();
+const spell = new magikEspellCheck();
