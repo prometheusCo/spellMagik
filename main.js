@@ -1,11 +1,12 @@
-//
-// Core methods class
+// Core utility methods
 class coreFunctions {
 
+    // Vowels used to better clasification
     vowelsOpened = ['a', 'e', 'o'];
     vowelsClosed = ['i', 'u'];
     vowels = [...this.vowelsOpened, ...this.vowelsClosed];
 
+    // Consonants types  used for ruling out of syllables
     plosives = ["p", "t", "k", "b", "d", "g"];
     fricatives = ["f", "s", "j", "z"];
     affricates = ["ch"];
@@ -14,7 +15,8 @@ class coreFunctions {
     approximants = ["b", "x"];
     vibrants = ["r", "rr"];
 
-    diphthongs = [
+    // Used to rule in valid vocals joins
+    diphthongsAndtriphthongs = [
         "ia", "ie", "io", 'uei',
         "ua", "ue", "uo", "ió",
         "ai", "ei", "oi",
@@ -24,7 +26,7 @@ class coreFunctions {
         "üé", "uí", "üí"
     ];
 
-    // Valid two-consonant ONSET clusters by SOUND TYPE 
+    // Valid two-consonant ONSET clusters by consonant (sound) TYPE
     valid2CSounds = [
         "PCLC", // pl, bl, cl, gl
         "PCVC", // pr, br, tr, dr, cr, gr
@@ -32,21 +34,21 @@ class coreFunctions {
         "FCVC", // fr
     ];
 
-    diphthongsExceptions = ["uí", "üí"]
-
+    // Used to rule out syllables with invalind endings 
     forbiddenEnds = ["c", "k"];
 
+    //Exceptions to rules above
     forbiddenEndsExc = [
         "pec", "truc", "trac", "vic", "dic", "fec", "fac", "ac",
         "obs", "dac", "cons", "duc", "jec"
     ];
 
     //
-    //Simple one liners helpers
+    // Simple one-liner helpers
     clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
     pos = n => n < 0 ? n * (-1) : n;
     //
-    // Given a word, returns it's structure (VOWEL + CONSONANT + VOWEL...)
+    // Given a word, return its V/C structure (e.g., VOWEL + CONSONANT + VOWEL…)
     getEst(word, returnType = "string") {
 
         word = this.clean(word)
@@ -57,14 +59,14 @@ class coreFunctions {
         return r;
     }
     //
-    // this checks for any kind of invalid input
+    // Check for any kind of invalid input
     isValid(val) {
         if (val === undefined || val === null || val.indexOf("undefined") >= 0 || val.indexOf("null") >= 0)
             return false;
         return true;
     }
     //
-    // Reverse array search
+    // Reverse search in an array; optionally allow loose (near-length) matches
     reverseSearch(word, array, loose = false) {
 
         let r = false;
@@ -76,14 +78,14 @@ class coreFunctions {
         return r;
     }
     //
-    // Move chars backwards/forward bettwen array's positions
+    // Move chars backward/forward between array positions
     moveAround(arr, pos, char, direction) {
 
         const to = direction === "right" ? pos + 1 : pos - 1;
         const cutIndex = direction === "right" ? -1 : 1;
-        // cut char from current slot
+        // Cut char from current slot
         arr[pos] = direction === "right" ? arr[pos].slice(0, cutIndex) : arr[pos].slice(cutIndex);
-        // glue char to neighbor
+        // Glue char to neighbor
         arr[to] = direction === "right" ? char + arr[to] : arr[to] + char;
         return arr;
     }
@@ -92,13 +94,13 @@ class coreFunctions {
 
 //
 //
-// Core methods extention
+// Core methods extension
 //
 class coreFunctionsExt extends coreFunctions {
 
     constructor() { super(); }
     //
-    // Given a word, returns it's structure (VOWEL + CONSONANT + VOWEL...) BUT WITH THE TYPE OF CONSONANT SPECIFIED
+    // Given a word, return its V/C structure BUT annotating consonant type (PC, FC, etc.)
     getEstExt(word, returnType = "array") {
 
         let wordAsArray = word.split("");
@@ -125,7 +127,7 @@ class coreFunctionsExt extends coreFunctions {
         return r;
     }
     //
-    //
+    // Validate first two letters (onset) against allowed clusters and exceptions
     isF2Valid(word) {
 
         let f2 = word.slice(0, 2); let f3 = word.slice(0, 3); let est = this.getEstExt(f2, "str");
@@ -147,12 +149,12 @@ class Syllabifyer extends coreFunctionsExt {
 
     constructor() {
         super();
-        //avoiding user's cold start, keepeing this at start it's optional
+        // Avoid user's cold start; priming cache with an example word is optional
         this.splitInSyllables("produccionando")
     }
 
     //
-    // Heuristic set of rules to help main loop to split in syllables better
+    // Heuristic rules to help the main loop split into syllables more accurately
     //
     rulesApply = (syllables) => {
 
@@ -168,10 +170,10 @@ class Syllabifyer extends coreFunctionsExt {
 
         let conjuntion = lastLastS + lastS;
 
-        //Sanity check
+        // Sanity check: limit to last 3 chars
         if (conjuntion.length > 3) conjuntion = conjuntion.slice(-3);
 
-        //We check if there's a invalid 2 consonants syllable and fix it
+        // If last syllable starts with invalid 2-consonant onset, fix it
         if (lasSEst.slice(0, 2) === "CC" && !this.isF2Valid(lastS)) {
 
             if (lastS == "ch" || lastS == "ll") {
@@ -182,45 +184,43 @@ class Syllabifyer extends coreFunctionsExt {
             this.moveAround(syllables, syllables.length - 1, firstLastS, "left");
         }
 
-        //Fixing invalid syllables endings
+        // Fix invalid syllable endings
         if (this.forbiddenEnds.includes(lastLetterLastlastS) && !this.forbiddenEndsExc.includes(this.clean(lastLastS)))
             this.moveAround(syllables, syllables.length - 2, lastLetterLastlastS, "right");
 
-        // No syllable can be made of 1 consonant only // If last letter from  prev syllable 
-        // and first from current form a diphthong we join them together
-        //
-        if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongs, true)))
+        // No syllable can be a single consonant.
+        // If last letter of previous + first of current form a diphthong, join them.
+        if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongsAndtriphthongs, true)))
             this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
-        //Sanity check
+        // Final cleanup
         return syllables.filter((s) => s !== "");
     }
 
     //  
-    //Heuristic syllables spliter
+    // Heuristic syllable splitter
     //
     splitInSyllables(word) {
 
         //console.time("miScript");
         word = word.toLowerCase();
 
-        let syllables = []; // syllables array, each position is a syllable
-        let syllablesTmp = ""; // tmp array used to store consonants bettwen found vowels
-        let wordAsArray = word.split(""); // given word as an array of letters
-        let wordAsEstArray = this.getEst(word, "array"); // word est (eje : CVC) also as array
+        let syllables = []; // Final syllables array; each element is one syllable
+        let syllablesTmp = ""; // Temp buffer to store consonants between detected vowels
+        let wordAsArray = word.split(""); // Word as an array of letters
+        let wordAsEstArray = this.getEst(word, "array"); // V/C structure as an array
 
-        // This adds a letter to tmp array
+        // Add a letter to the temp buffer
         const tmpAdd = (currentLetter) => { syllablesTmp += currentLetter; }
-        // This push what's stored in tmp + current letter to syllables's array last position
+        // Push temp buffer + current letter as a syllable; then reset buffer
         const tmpPush = (currentLetter) => { syllables.push(syllablesTmp + currentLetter); syllablesTmp = ""; }
-        // this checks if we have reached the end of the word and push wht's left in tmp to sayllables 
+        // At the end of the word, flush whatever is left in the temp buffer
         const emptyPush = () => tmpPush("");
 
         //
-        // Main method loop
-        // Iterates each letter, if its a consonant, stores it in tmp array, if it's a vowel
-        // saves it to syllables array, adding what's stored in tmp before it
-        // for each syllable pushed to final results array, we do a post processing in RulesAplly
+        // Main loop:
+        // Iterate letters; accumulate consonants; on vowel, push syllable (buffer + vowel).
+        // After each push, run rule-based post-processing (rulesApply).
         //
         const end = wordAsArray.length - 1;
         for (let index = 0; index <= end; index++) {
