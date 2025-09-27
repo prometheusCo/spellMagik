@@ -59,14 +59,9 @@ class coreFunctions {
         return r;
     }
     //
-    // Check for any kind of invalid input
-    isValid(val) {
-        if (val === undefined || val === null || val.indexOf("undefined") >= 0 || val.indexOf("null") >= 0)
-            return false;
-        return true;
-    }
-    //
-    // Reverse search in an array; optionally allow loose (near-length) matches
+    // Try to find a match for a `word` inside an `array`. If `loose` is false → only exact matches are found
+    // if `loose` is true → near matches are allow . Returns the first matching element, or `false`.
+    // 
     reverseSearch(word, array, loose = false) {
 
         let r = false;
