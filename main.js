@@ -145,9 +145,55 @@ class magikESpeller extends coreFunctionsExt {
 
     constructor() {
         super();
-        //avoiding user's cold start
+        //avoiding user's cold start, keepeing this at start it's optional
         this.splitInSyllables("produccionando")
     }
+
+    //
+    // Heuristic set of rules to help main loop to split in syllables better
+    //
+    rulesApply = (syllables) => {
+
+        const lastS = syllables[syllables.length - 1];
+        const lastLastS = syllables[syllables.length - 2] ?? false;
+
+        if (!lastLastS) return syllables;
+
+        const lastLetterLastlastS = lastLastS[lastLastS.length - 1];
+        const lasSEst = this.getEst(lastS);
+        const firstLastS = lastS.slice(0, 1);
+        const firstLetLastEst = this.getEst(firstLastS)
+
+        let conjuntion = lastLastS + lastS;
+
+        //Sanity check
+        if (conjuntion.length > 3) conjuntion = conjuntion.slice(-3);
+
+        //We check if there's a invalid 2 consonants syllable and fix it
+        if (lasSEst.slice(0, 2) === "CC" && !this.isF2Valid(lastS)) {
+
+            if (lastS == "ch" || lastS == "ll") {
+                syllables[syllables.length - 2] = syllables[syllables.length - 2] + lastS;
+                syllables.pop();
+                return syllables;
+            }
+            this.moveAround(syllables, syllables.length - 1, firstLastS, "left");
+        }
+
+        //Fixing invalid syllables endings
+        if (this.forbiddenEnds.includes(lastLetterLastlastS) && !this.forbiddenEndsExc.includes(this.clean(lastLastS)))
+            this.moveAround(syllables, syllables.length - 2, lastLetterLastlastS, "right");
+
+        // No syllable can be made of 1 consonant only // If last letter from  prev syllable 
+        // and first from current form a diphthong we join them together
+        //
+        if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongs, true)))
+            this.moveAround(syllables, syllables.length - 1, lastS, "left");
+
+        //Sanity check
+        return syllables.filter((s) => s !== "");
+    }
+
     //  
     //Heuristic syllables spliter
     //
@@ -168,54 +214,11 @@ class magikESpeller extends coreFunctionsExt {
         // this checks if we have reached the end of the word and push wht's left in tmp to sayllables 
         const emptyPush = () => tmpPush("");
 
-        //Check if latest push to sylables makes any sense and in case it doesn't, it fixes it
-        const rulesApply = (syllables) => {
-
-            const lastS = syllables[syllables.length - 1];
-            const lastLastS = syllables[syllables.length - 2] ?? false;
-
-            if (!lastLastS) return syllables;
-
-            const lastLetterLastlastS = lastLastS[lastLastS.length - 1];
-            const lasSEst = this.getEst(lastS);
-            const firstLastS = lastS.slice(0, 1);
-            const firstLetLastEst = this.getEst(firstLastS)
-
-            let conjuntion = lastLastS + lastS;
-
-            //Sanity check
-            if (conjuntion.length > 3) conjuntion = conjuntion.slice(-3);
-
-            //We check if there's a invalid 2 consonants syllable and fix it
-            if (lasSEst.slice(0, 2) === "CC" && !this.isF2Valid(lastS)) {
-
-                if (lastS == "ch" || lastS == "ll") {
-                    syllables[syllables.length - 2] = syllables[syllables.length - 2] + lastS;
-                    syllables.pop();
-                    return syllables;
-                }
-                this.moveAround(syllables, syllables.length - 1, firstLastS, "left");
-            }
-
-            //Fixing invalid syllables endings
-            if (this.forbiddenEnds.includes(lastLetterLastlastS) && !this.forbiddenEndsExc.includes(this.clean(lastLastS)))
-                this.moveAround(syllables, syllables.length - 2, lastLetterLastlastS, "right");
-
-            // No syllable can be made of 1 consonant only // If last letter from  prev syllable 
-            // and first from current form a diphthong we join them together
-            //
-            if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongs, true)))
-                this.moveAround(syllables, syllables.length - 1, lastS, "left");
-
-            //Sanity check
-            return syllables.filter((s) => s !== "");
-        }
-
         //
         // Main method loop
         // Iterates each letter, if its a consonant, stores it in tmp array, if it's a vowel
         // saves it to syllables array, adding what's stored in tmp before it
-        // it has rules to handle dipthongs and syllables that starts in vowel and end in consonant, etc...
+        // for each syllable pushed to final results array, we do a post processing in RulesAplly
         //
         const end = wordAsArray.length - 1;
         for (let index = 0; index <= end; index++) {
@@ -227,15 +230,15 @@ class magikESpeller extends coreFunctionsExt {
 
                 tmpAdd(currentLetter);
                 if (index === end) emptyPush();
-                syllables.length > 0 ? syllables = rulesApply(syllables) : null;
+                syllables.length > 0 ? syllables = this.rulesApply(syllables) : null;
                 continue;
             }
 
             tmpPush(currentLetter);
-            syllables = rulesApply(syllables);
+            syllables = this.rulesApply(syllables);
         }
         //console.timeEnd("miScript");
-        return rulesApply(syllables);
+        return this.rulesApply(syllables);
     }
 
 }
