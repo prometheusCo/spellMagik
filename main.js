@@ -50,6 +50,16 @@ class coreFunctions {
     isValid = val => val !== undefined && val !== "" && val !== null && val !== "undefined";
     replaceCharAt = (str, pos, char) => str.slice(0, pos) + char + str.slice(pos + 1);
     splitArrayAt = (arr, pos) => [arr.slice(0, pos), arr.slice(pos)];
+
+    //
+    //Litle  helper to measure code exec time
+    printTime(start) {
+
+        const end = performance.now();
+        const seconds = (end - start) / 1000;
+        console.log("miScript:", seconds.toFixed(4), " segs");
+    }
+
     //
     // Given a word, return its V/C structure (e.g., VOWEL + CONSONANT + VOWEL…)
     getEst(word, returnType = "string") {
@@ -322,47 +332,106 @@ class magikEspellCheck extends Syllabifier {
         if (syllableEst.slice(0, 3) === "CCC")
             return false;
 
-        if ((syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" || syllableEst === "CVC")
-            && (!this.invalidSyllablesEndings.includes(syllableEnding) || this.invalidSyllablesEndingsExceptions.includes(syllable)))
-            return true;
+        let hasInvalidEnding = this.invalidSyllablesEndings.includes(syllableEnding);
+        let hasEndingExceps = this.invalidSyllablesEndingsExceptions.includes(syllable.slice(length - 2));
+
+        if (!(syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" || syllableEst === "CVC")
+            || (hasInvalidEnding && !hasEndingExceps))
+            return false;
 
         return this.isF2Valid(syllable)
     }
 
     //
     //
-    generateVariations(entry, pool = [...this.consonantsTypes, ...["V"]], includeSame = false) {
+    smartDivide(word, start = performance.now()) {
+
+        let syllables = super.splitInSyllables(word); // original syllables array
+        let invalidSylls = [...syllables].map((a) => !this.isValidSyllable(a) ? a : false);
+        let syllablesRV = [];// Results array replacing slots with vowels
+        let pointer = 0;
 
 
-        return entry;
+        // First rule, no word can end in an only consonant syllable
+        if (this.getEst(syllables.at(-1)) === "C")
+            this.moveAround(syllables, syllables.length - 1, syllables.at(-1)[0], "left")
+
+        //
+        //
+        // If no wovels found or they are located only at the start and / or the end
+
+        let _syllableAsString = syllables.join(""),
+            estSG = this.getEst(_syllableAsString.replaceAll(",", "")),
+            numberOfVowels = estSG.split("V").length - 1;
+
+        // We ignore any previous syllbables estructure and start over looping over the og word
+        // Otherwise we loop over returned syllables arrays from splitInSyllables methods
+        //
+        if (numberOfVowels <= 1 || ((estSG[0] === "V" || estSG[estSG.length - 1] === "V") && numberOfVowels <= 2))
+            invalidSylls = [_syllableAsString];
+
+        //
+        // main method loop helper no 1
+        const singleSyllLogicApply = (index, char, charEst, nextNextChar, nextCharEst, nextNextCharEst, prevSyll, syllableAsString) => {
+
+            // If first 3 chars are `C` and a inserting a vowel in middle we get a valid syllable, we split it from threre
+            if (charEst === "C" && nextCharEst === "C" && nextNextCharEst === "C" && this.isValidSyllable(char + "i" + nextNextChar)) {
+                syllablesRV.push((char + " /a|e|i|o|u/ " + nextNextChar));
+                pointer = index + 3;
+            }
+
+            // Code bellow fix its wrong syllables partitions ( if only one syllable is return it won't trigger)
+            if (!prevSyll) return;
+            const prevChar = prevSyll[prevSyll.length - 1] ?? false
+            const prevCharEst = this.getEst(prevChar) ?? false;
+
+            if (((prevCharEst === "C" && charEst === "C") || (prevCharEst === "C" && charEst === "V"))
+                && pointer <= index)
+                syllablesRV[syllablesRV.length - 1] = syllablesRV[syllablesRV.length - 1] + " /a|e|i|o|u/ ";
+        }
+
+        //
+        // Main method loop
+        //
+        invalidSylls.forEach((syllableAsString, indexG) => {
+
+            if (!syllableAsString) {
+                syllablesRV.push(syllables[indexG]); return;
+            }
+
+            console.log(syllableAsString);
+            let estS = this.getEst(syllableAsString.replaceAll(/,/g, ""));
+
+            for (let index = 0; index < syllableAsString.length; index++) {
+
+                const char = syllableAsString[index];
+                const charEst = estS[index];
+                const nextCharEst = estS[index + 1] ?? false;
+                const nextNextChar = syllableAsString[index + 2] ?? false;
+                const nextNextCharEst = estS[index + 2] ?? false;
+                const prevSyll = syllableAsString[pointer - 1] ?? false;
+
+                if (index < pointer) continue;
+
+                if (invalidSylls.length === 1) {
+
+                    singleSyllLogicApply(
+                        index, char, charEst, nextNextChar,
+                        nextCharEst, nextNextCharEst, prevSyll,
+                        syllableAsString
+                    );
+                }
+
+            }
+        });
+
+
+        console.log("syllables ==> " + syllables);
+        console.log("syllables RV==> " + syllablesRV.join(" || "));
+        this.printTime(start);
     }
 
-    //
-    //
-    smartDivide(syllables) {
 
-        let sylls = syllables.join("");
-
-    }
-
-    //
-    // Given a word, takes it's misspelled syllables and returns plausible variations for them
-    mutate(word) {
-        const start = performance.now();
-
-        const syllables = super.splitInSyllables(word); // original syllables array
-        let syllablesMS = [...syllables]; // Misspelled syllables
-        let mutations = new Map(); // Map with all mutations (is like using php asociatives arrays)
-
-        // Sanitation check
-        if (syllablesMS.length === 1 || syllablesMS[length - 1] === 1)
-            syllablesMS = this.smartDivide(syllables);
-
-        const end = performance.now();
-        const seconds = (end - start) / 1000;
-        console.log("miScript:", seconds.toFixed(4), " segs");
-
-    }
 
 }
 
