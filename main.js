@@ -5,7 +5,7 @@ class coreFunctions {
     minSimilarity = 0.7;
 
     // Vowels used to better clasification
-    vowels = ['a', 'e', 'o', 'u', 'i'];
+    vowels = ['a', 'e', 'o', 'u', 'i', '$'];
 
     // Consonants types  used for ruling out of syllables
     plosives = ["PC", "p", "t", "k", "b", "d", "g"];
@@ -306,7 +306,8 @@ class Syllabifier extends coreFunctionsExt {
 }
 
 //
-// Class extension to the main Syllabifyer class, focused on syllabifying misspelled words
+// Class extension to the main Syllabifyer class, focused on syllabifying
+// misspelled words, using more complex heruistic rules
 //
 class magikEspellCheck extends Syllabifier {
 
@@ -349,7 +350,7 @@ class magikEspellCheck extends Syllabifier {
         let syllables = super.splitInSyllables(word); // original syllables array
         let invalidSylls = [...syllables].map((a) => !this.isValidSyllable(a) ? a : false);
         let syllablesRV = [];// Results array replacing slots with vowels
-        let pointer = 0;
+        let pointer = 0, estS;
 
 
         // First rule, no word can end in an only consonant syllable
@@ -371,27 +372,27 @@ class magikEspellCheck extends Syllabifier {
             invalidSylls = [_syllableAsString];
 
         //
-        // main method loop helper no 1
-        const singleSyllLogicApply = (index, char, charEst, nextNextChar, nextCharEst, nextNextCharEst, prevSyll, syllableAsString) => {
+        // main method loop helper 
+        const vowelsLogicApply = (chars, index, pointer) => {
 
-            // If first 3 chars are `C` and a inserting a vowel in middle we get a valid syllable, we split it from threre
-            if (charEst === "C" && nextCharEst === "C" && nextNextCharEst === "C" && this.isValidSyllable(char + "i" + nextNextChar)) {
-                syllablesRV.push((char + " /a|e|i|o|u/ " + nextNextChar));
-                pointer = index + 3;
+            const cn1 = chars[index - 1] ?? false;
+            const c1 = chars[index];
+            const c2 = chars[index + 1] ?? false;
+
+            if ((!c2 && this.getEst(cn1 + c1) === "CC" || this.getEst(cn1 + c1 + c2) === "CCC") &&
+                ((cn1 !== c1)) && this.isValidSyllable(cn1 + "i")) {
+
+                chars = this.replaceCharAt(chars, index, "$");
+                pointer = index;
             }
 
-            // Code bellow fix its wrong syllables partitions ( if only one syllable is return it won't trigger)
-            if (!prevSyll) return;
-            const prevChar = prevSyll[prevSyll.length - 1] ?? false
-            const prevCharEst = this.getEst(prevChar) ?? false;
 
-            if (((prevCharEst === "C" && charEst === "C") || (prevCharEst === "C" && charEst === "V"))
-                && pointer <= index)
-                syllablesRV[syllablesRV.length - 1] = syllablesRV[syllablesRV.length - 1] + " /a|e|i|o|u/ ";
+            return chars;
         }
 
         //
-        // Main method loop
+        // Main method loop depending of the main Syllabifier success's rate
+        // it's applies various advanced heuristic methods 
         //
         invalidSylls.forEach((syllableAsString, indexG) => {
 
@@ -399,33 +400,21 @@ class magikEspellCheck extends Syllabifier {
                 syllablesRV.push(syllables[indexG]); return;
             }
 
-            console.log(syllableAsString);
-            let estS = this.getEst(syllableAsString.replaceAll(/,/g, ""));
+            estS = this.getEst(syllableAsString.replaceAll(/,/g, ""));
 
             for (let index = 0; index < syllableAsString.length; index++) {
 
-                const char = syllableAsString[index];
-                const charEst = estS[index];
-                const nextCharEst = estS[index + 1] ?? false;
-                const nextNextChar = syllableAsString[index + 2] ?? false;
-                const nextNextCharEst = estS[index + 2] ?? false;
-                const prevSyll = syllableAsString[pointer - 1] ?? false;
+                if (index < pointer)
+                    continue;
 
-                if (index < pointer) continue;
-
-                if (invalidSylls.length === 1) {
-
-                    singleSyllLogicApply(
-                        index, char, charEst, nextNextChar,
-                        nextCharEst, nextNextCharEst, prevSyll,
-                        syllableAsString
-                    );
-                }
+                syllableAsString = vowelsLogicApply(syllableAsString, index, pointer);
 
             }
+            syllablesRV.push(syllableAsString);
         });
 
-
+        //Sanitizing
+        syllablesRV.map((s) => s.replace(/false/g, ""));
         console.log("syllables ==> " + syllables);
         console.log("syllables RV==> " + syllablesRV.join(" || "));
         this.printTime(start);
