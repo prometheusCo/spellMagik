@@ -42,7 +42,7 @@ class coreFunctions {
     // Used to determine if a syllable is misspelled by looking at it's ending letters
     invalidSyllablesEndings = ["k", "g", "c", "x"];
 
-    invalidSyllablesEndingsExceptions = ["ac", "oc", "ec", "ic"]
+    invalidSyllablesEndingsExceptions = ["ac", "oc", "ec", "ic", "ag", "ex"]
     //
     // Simple one-liner helpers
     clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
@@ -169,22 +169,23 @@ class coreFunctionsExt extends coreFunctions {
     // Validate first two letters (onset) against allowed clusters and exceptions
     isF2Valid(word) {
 
-        const isEst = (word[0] !== word[0].toLowerCase()) ? true : false;
-
-        let f2 = !isEst ? word.slice(0, 2) : "";
-        let f3 = !isEst ? word.slice(0, 3) : "";
-        let est = !isEst ? this.getEstExt(f2, "str") : word.slice(0, 4);
-        let estS = !isEst ? this.getEst(word, "string").slice(0, 2) : word;
+        let f2 = word.slice(0, 2)
+        let f3 = word.slice(0, 3);
+        let est = this.getEstExt(f2, "str");
+        let estS = this.getEst(word, "string").slice(0, 2);
 
         // Early return for easy cases
         if (estS === "CV" || estS == "VC")
             return true;
+
         // If first 2 letters starts in forbiden chars or full word is a 2 chars forbiden type, then we return false
         if (f2 === "cc" || word === "ch" || word === "rr" || word === "ll")
             return false;
+
         // If first 2 chars are common spanish 2 letters formed sounds or know 3 chars exceptions, then we return true
         if (((f2 === "rr" || f2 === "ll" || f2 == "ch" || f2 === "ps") && word.length > 2) || f3 === "ciu" || f3 === "cie")
             return true;
+
         // Otherwise we  test the current sound patter to those allowed in spanish (for the firs 2C)
         return this.valid2CSounds.includes(est);
     }
@@ -308,13 +309,9 @@ class magikEspellCheck extends Syllabifier {
     // structure, last char type or general structure of the syllable
     isValidSyllable(syllable) {
 
-        let isEst;
-        try { isEst = (syllable[0] !== syllable[0].toLowerCase()) ? true : false; } catch (error) { return false; }
-
-        const syllableEst = !isEst ? this.getEst(syllable) : syllable.join("").replaceAll(/[A-B|D-U| W-Z]/g, "");
-        const syllableEnding = !isEst ? syllable.slice(syllable.length - 1) : "";
-        const f2l = !isEst ? syllable.slice(0, 2) : "";
-
+        const syllableEst = this.getEst(syllable);
+        const syllableEnding = syllable.slice(syllable.length - 1);
+        const f2l = syllable.slice(0, 2);
 
         if (syllableEst === "C")
             return false;
@@ -325,16 +322,10 @@ class magikEspellCheck extends Syllabifier {
         if (syllableEst.slice(0, 3) === "CCC")
             return false;
 
-
-        if (isEst && syllable.at(-1) === "AFC")
-            return false;
-
         if ((syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" || syllableEst === "CVC")
             && (!this.invalidSyllablesEndings.includes(syllableEnding) || this.invalidSyllablesEndingsExceptions.includes(syllable)))
             return true;
 
-
-        if (isEst) syllable = syllable.join("");
         return this.isF2Valid(syllable)
     }
 
@@ -342,27 +333,16 @@ class magikEspellCheck extends Syllabifier {
     //
     generateVariations(entry, pool = [...this.consonantsTypes, ...["V"]], includeSame = false) {
 
-        const entryAsStrt = entry.join("");
-        const indices = [...entry.keys()];
-        const combos = (xs) =>
-            xs.reduce(
-                (acc, x) => acc.concat(acc.map(s => s.concat(x))),
-                [[]]
-            ).slice(1); // empty cluster filtering
 
-        const optionsAt = i => (includeSame ? pool : pool.filter(t => t !== entry[i]));
-        const replaceAt = (arr, i, val) => arr.map((x, k) => (k === i ? val : x));
-        const cartesian = (arrays) =>
-            arrays.reduce((a, b) => a.flatMap(x => b.map(y => x.concat([y]))), [[]]);
+        return entry;
+    }
 
-        let r = combos(indices).flatMap(idxs =>
-            cartesian(idxs.map(i => optionsAt(i))).map(tokens =>
-                idxs.reduce((acc, i, p) => replaceAt(acc, i, tokens[p]), entry)
-            )
-        );
+    //
+    //
+    smartDivide(syllables) {
 
-        r = r.filter((v) => this.isValidSyllable(v));
-        return r;
+        let sylls = syllables.join("");
+
     }
 
     //
@@ -374,43 +354,14 @@ class magikEspellCheck extends Syllabifier {
         let syllablesMS = [...syllables]; // Misspelled syllables
         let mutations = new Map(); // Map with all mutations (is like using php asociatives arrays)
 
-        // classifying misspelled syllables
-        for (let index = 0; index < syllables.length; index++) {
-
-            const currentPos = syllables[index];
-            if (this.isValidSyllable(currentPos))
-                syllablesMS[index] = "";
-        }
-
         // Sanitation check
-        syllablesMS = syllablesMS.length === 1 || syllablesMS.at(-1).length === 1 ?
-            this.splitArrayAt(syllables.join(""), syllables.join("").length / 2) : syllablesMS;
+        if (syllablesMS.length === 1 || syllablesMS[length - 1] === 1)
+            syllablesMS = this.smartDivide(syllables);
 
-        // Generating mutations for each misspelled syllable
-        syllablesMS.forEach((sylms, index) => {
-
-            if (!this.isValid(sylms))
-                return;
-
-            !mutations.has(`${sylms}`) ? mutations.set(`${sylms}`, []) : null;
-
-            let _mutations = this.generateVariations(this.getEstExt(sylms));
-            mutations.get(`${sylms}`).push(_mutations);
-
-        })
-
-        syllablesMS.forEach((sylms, index) => {
-
-
-        });
-
-
-        console.timeEnd("miScript");
         const end = performance.now();
         const seconds = (end - start) / 1000;
+        console.log("miScript:", seconds.toFixed(4), " segs");
 
-        console.log("miScript:", seconds.toFixed(3), " segs");
-        console.log(mutations);
     }
 
 }
