@@ -199,6 +199,34 @@ class coreFunctionsExt extends coreFunctions {
         // Otherwise we  test the current sound patter to those allowed in spanish (for the firs 2C)
         return this.valid2CSounds.includes(est);
     }
+
+    //
+    // Detects whether a syllable is misspelled or not based on first 2 consonants,
+    // structure, last char type or general structure of the syllable
+    isValidSyllable(syllable) {
+
+        const syllableEst = this.getEst(syllable);
+        const syllableEnding = syllable.slice(syllable.length - 1);
+        const f2l = syllable.slice(0, 2);
+
+        if (syllableEst === "C")
+            return false;
+
+        if (syllableEst === "V")
+            return true;
+
+        if (syllableEst.slice(0, 3) === "CCC")
+            return false;
+
+        let hasInvalidEnding = this.invalidSyllablesEndings.includes(syllableEnding);
+        let hasEndingExceps = this.invalidSyllablesEndingsExceptions.includes(syllable.slice(length - 2));
+
+        if (!(syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" || syllableEst === "CVC")
+            || (hasInvalidEnding && !hasEndingExceps))
+            return false;
+
+        return this.isF2Valid(syllable)
+    }
 }
 
 //
@@ -240,7 +268,8 @@ class Syllabifier extends coreFunctionsExt {
         if (conjuntion.length > 3) conjuntion = conjuntion.slice(-3);
 
         // If last syllable starts with invalid 2-consonant onset, fix it
-        if (lasSEst.slice(0, 2) === "CC" && !this.isF2Valid(lastS)) {
+        // Syllables with only 2 chars won't fit this rule
+        if (lasSEst.slice(0, 2) === "CC" && !this.isF2Valid(lastS) && lasSEst.length > 2) {
 
             if (lastS == "ch" || lastS == "ll") {
                 syllables[syllables.length - 2] = syllables[syllables.length - 2] + lastS;
@@ -300,6 +329,7 @@ class Syllabifier extends coreFunctionsExt {
             tmpPush(currentLetter);
             syllables = this.rulesApply(syllables);
         }
+        console.log(syllables);
         return this.rulesApply(syllables);
     }
 
@@ -313,34 +343,6 @@ class magikEspellCheck extends Syllabifier {
 
     constructor() {
         super();
-    }
-
-    //
-    // Detects whether a syllable is misspelled or not based on first 2 consonants,
-    // structure, last char type or general structure of the syllable
-    isValidSyllable(syllable) {
-
-        const syllableEst = this.getEst(syllable);
-        const syllableEnding = syllable.slice(syllable.length - 1);
-        const f2l = syllable.slice(0, 2);
-
-        if (syllableEst === "C")
-            return false;
-
-        if (syllableEst === "V")
-            return true;
-
-        if (syllableEst.slice(0, 3) === "CCC")
-            return false;
-
-        let hasInvalidEnding = this.invalidSyllablesEndings.includes(syllableEnding);
-        let hasEndingExceps = this.invalidSyllablesEndingsExceptions.includes(syllable.slice(length - 2));
-
-        if (!(syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" || syllableEst === "CVC")
-            || (hasInvalidEnding && !hasEndingExceps))
-            return false;
-
-        return this.isF2Valid(syllable)
     }
 
     //
