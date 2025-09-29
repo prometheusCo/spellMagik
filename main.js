@@ -242,6 +242,7 @@ class Syllabifier extends coreFunctionsExt {
     }
 
     SyllableHasValidEnding(lastLetterLastlastS, lastLastS) {
+
         if (this.forbiddenEnds.includes(lastLetterLastlastS) && !this.forbiddenEndsExc.includes(this.clean(lastLetterLastlastS)))
             return false;
         return true;
@@ -269,14 +270,13 @@ class Syllabifier extends coreFunctionsExt {
 
         // If last syllable starts with invalid 2-consonant onset, fix it
         // Syllables with only 2 chars won't fit this rule
-        if (lasSEst.slice(0, 2) === "CC" && !this.isF2Valid(lastS) && lasSEst.length > 2) {
-
-            if (lastS == "ch" || lastS == "ll") {
-                syllables[syllables.length - 2] = syllables[syllables.length - 2] + lastS;
-                syllables.pop();
-                return syllables;
-            }
+        if (lasSEst.slice(0, 2) === "CC" && !this.isF2Valid(lastS) && lasSEst.length > 2)
             this.moveAround(syllables, syllables.length - 1, firstLastS, "left");
+
+        if (lastS == "ch" || lastS == "ll") {
+            syllables[syllables.length - 2] = syllables[syllables.length - 2] + lastS;
+            syllables.pop();
+            return syllables;
         }
 
         // No syllable can be a single consonant.
@@ -349,7 +349,7 @@ class magikEspellCheck extends Syllabifier {
     //
     smartDivide(word, start = performance.now()) {
 
-        let syllables = super.splitInSyllables(word); // original syllables array
+        let syllables = this.splitInSyllables(word); // original syllables array
         let invalidSylls = [...syllables].map((a) => !this.isValidSyllable(a) ? a : false);
         let syllablesRV = [];// Results array replacing slots with vowels
         let pointer = 0, estS;
@@ -378,16 +378,27 @@ class magikEspellCheck extends Syllabifier {
         const vowelsLogicApply = (chars, index, pointer) => {
 
             const cn1 = chars[index - 1] ?? false;
-            const c1 = chars[index];
-            const c2 = chars[index + 1] ?? false;
+            const cn2 = chars[index - 2] ?? false;
 
-            if ((!c2 && this.getEst(cn1 + c1) === "CC" || this.getEst(cn1 + c1 + c2) === "CCC") &&
-                ((cn1 !== c1)) && this.isValidSyllable(cn1 + "i")) {
+            const c0 = chars[index];
+            const c1 = chars[index + 1] ?? false;
+            const c2 = chars[index + 2] ?? false;
 
+            if (this.getEst(c0) !== "V" && this.isValidSyllable(cn1 + "i" + c1) && this.getEst(cn1 + c0) !== "VV"
+                && this.getEst(cn2 + cn1) !== "VV") {
                 chars = this.replaceCharAt(chars, index, "$");
                 pointer = index;
             }
 
+            if (!c1 && this.getEst(cn1 + c0) === "CC")
+                chars = this.replaceCharAt(chars, index, "$");
+
+            if (!cn2 || !c1)
+                return chars;
+
+            if (this.isF2Valid(cn2 + cn1) && this.getEst(cn2 + cn1) === "CC" && this.getEst(c0) === "V") {
+                chars = this.replaceCharAt(chars, index + 1, "$");
+            }
 
             return chars;
         }
@@ -410,15 +421,17 @@ class magikEspellCheck extends Syllabifier {
                     continue;
 
                 syllableAsString = vowelsLogicApply(syllableAsString, index, pointer);
-
             }
+
             syllablesRV.push(syllableAsString);
+            syllablesRV.length === 1 ? syllablesRV = this.splitInSyllables(syllablesRV.join()) : null;
+
+
         });
 
         //Sanitizing
-        syllablesRV.map((s) => s.replace(/false/g, ""));
-        console.log("syllables ==> " + syllables);
-        console.log("syllables RV==> " + syllablesRV.join(" || "));
+        console.log(syllablesRV);
+
         this.printTime(start);
     }
 
