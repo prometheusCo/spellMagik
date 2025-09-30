@@ -8,13 +8,13 @@ class coreFunctions {
     vowels = ['a', 'e', 'o', 'u', 'i', '$'];
 
     // Consonants types  used for ruling out of syllables
-    plosives = ["PC", "p", "t", "k", "b", "d", "g"];
-    fricatives = ["FC", "f", "s", "j", "z"];
-    affricates = ["AFC", "ch"];
-    nasals = ["NC", "m", "n", "ñ"];
-    laterals = ["LC", "l", "ll"];
-    approximants = ["AC", "b", "x"];
-    vibrants = ["BC", "r", "rr"];
+    plosives = ["PC", "p", "t", "k", "b", "d", "g", "#"];
+    fricatives = ["FC", "f", "s", "j", "z", "#"];
+    affricates = ["AFC", "ch", "#"];
+    nasals = ["NC", "m", "n", "ñ", "#"];
+    laterals = ["LC", "l", "ll", "#"];
+    approximants = ["AC", "b", "x", "#"];
+    vibrants = ["BC", "r", "rr", "#"];
 
     consonantsTypes = ["PC", "FC", "NC", "LC", "AC", "BC"]
 
@@ -293,8 +293,6 @@ class Syllabifier extends coreFunctionsExt {
     //
     splitInSyllables(word) {
 
-        word = word.toLowerCase();
-
         let syllables = []; // Final syllables array; each element is one syllable
         let syllablesTmp = ""; // Temp buffer to store consonants between detected vowels
         let wordAsArray = word.split(""); // Word as an array of letters
@@ -329,7 +327,6 @@ class Syllabifier extends coreFunctionsExt {
             tmpPush(currentLetter);
             syllables = this.rulesApply(syllables);
         }
-        console.log(syllables);
         return this.rulesApply(syllables);
     }
 
@@ -347,54 +344,39 @@ class magikEspellCheck extends Syllabifier {
 
     //
     //
-    smartDivide(word, start = performance.now()) {
+    smartDivide(word) {
 
-        let syllables = this.splitInSyllables(word); // original syllables array
-        let invalidSylls = [...syllables].map((a) => !this.isValidSyllable(a) ? a : false);
-        let syllablesRV = [];// Results array replacing slots with vowels
-        let pointer = 0, estS;
+        let syllables = word;
+        let syllablesC = syllables; // String copy to use in vowels replacing
+        let estS = this.getEst(syllables.replaceAll(/,/g, ""));
 
-
-        // First rule, no word can end in an only consonant syllable
-        if (this.getEst(syllables.at(-1)) === "C")
-            this.moveAround(syllables, syllables.length - 1, syllables.at(-1)[0], "left")
-
-        //
-        //
-        // If no wovels found or they are located only at the start and / or the end
-
-        let _syllableAsString = syllables.join(""),
-            estSG = this.getEst(_syllableAsString.replaceAll(",", "")),
-            numberOfVowels = estSG.split("V").length - 1;
-
-        // We ignore any previous syllbables estructure and start over looping over the og word
-        // Otherwise we loop over returned syllables arrays from splitInSyllables methods
-        //
-        if (numberOfVowels <= 1 || ((estSG[0] === "V" || estSG[estSG.length - 1] === "V") && numberOfVowels <= 2))
-            invalidSylls = [_syllableAsString];
 
         //
         // main method loop helper 
-        const vowelsLogicApply = (chars, index, pointer) => {
+        const vowelsLogicApply = (chars, index) => {
 
-            const cn1 = chars[index - 1] ?? false;
+            let cn1 = chars[index - 1] ?? false;
             const cn2 = chars[index - 2] ?? false;
 
-            const c0 = chars[index];
+            let c0 = chars[index] ?? "";
             const c1 = chars[index + 1] ?? false;
             const c2 = chars[index + 2] ?? false;
 
-            if (this.getEst(c0) !== "V" && this.isValidSyllable(cn1 + "i" + c1) && this.getEst(cn1 + c0) !== "VV"
-                && this.getEst(cn2 + cn1) !== "VV") {
-                chars = this.replaceCharAt(chars, index, "$");
-                pointer = index;
-            }
+            const is2FV = this.isF2Valid(cn1 + c0);
 
-            if (!c1 && this.getEst(cn1 + c0) === "CC")
+            if (this.getEst(c0) !== "V" && this.isValidSyllable(cn1 + "i" + c1) && this.getEst(cn1 + c0) !== "VV"
+                && this.getEst(cn2 + cn1) !== "VV" && !is2FV)
+                chars = this.replaceCharAt(chars, index, "$");
+
+            if (!c1 && this.getEst(cn1 + c0) === "CC" && c0 !== "s")
                 chars = this.replaceCharAt(chars, index, "$");
 
             if (!cn2 || !c1)
                 return chars;
+
+            if (this.getEst(cn2 + cn1 + c0 + c1) === "VCCC" && !is2FV)
+                chars = this.replaceCharAt(chars, index, "$");
+
 
             if (this.isF2Valid(cn2 + cn1) && this.getEst(cn2 + cn1) === "CC" && this.getEst(c0) === "V") {
                 chars = this.replaceCharAt(chars, index + 1, "$");
@@ -403,39 +385,93 @@ class magikEspellCheck extends Syllabifier {
             return chars;
         }
 
+
+        const consonantsLogicApply = (chars, index) => {
+
+            const cn1 = chars[index - 1] ?? false;
+            const cn2 = chars[index - 2] ?? false;
+
+            let c0 = chars[index] ?? "";
+            const c1 = chars[index + 1] ?? false;
+            const c2 = chars[index + 2] ?? false;
+
+            if (this.getEst(c0 + c1) === "VV" && !this.diphthongsAndtriphthongs.includes(c0 + c1) &&
+                !this.diphthongsAndtriphthongs.includes(cn1 + c0) && this.getEst(c0 + c1 + c2) !== "VVV") {
+                chars = this.replaceCharAt(chars, index, "#");
+            }
+
+            return chars;
+        }
+
         //
         // Main method loop depending of the main Syllabifier success's rate
-        // it's applies various advanced heuristic methods 
+        // it's applies various advanced heuristic methods
         //
-        invalidSylls.forEach((syllableAsString, indexG) => {
 
-            if (!syllableAsString) {
-                syllablesRV.push(syllables[indexG]); return;
-            }
+        for (let index = 0; index < syllables.length; index++) {
 
-            estS = this.getEst(syllableAsString.replaceAll(/,/g, ""));
+            syllables = vowelsLogicApply(syllables, index);
+            syllablesC = consonantsLogicApply(syllablesC, index);
 
-            for (let index = 0; index < syllableAsString.length; index++) {
+        }
 
-                if (index < pointer)
-                    continue;
-
-                syllableAsString = vowelsLogicApply(syllableAsString, index, pointer);
-            }
-
-            syllablesRV.push(syllableAsString);
-            syllablesRV.length === 1 ? syllablesRV = this.splitInSyllables(syllablesRV.join()) : null;
-
-
-        });
-
-        //Sanitizing
-        console.log(syllablesRV);
-
-        this.printTime(start);
+        return [syllables, syllablesC];
     }
 
+    //
+    //
+    makeVariations(word) {
 
+        let smartDVrs = this.smartDivide(word), syllabified = [];
+
+        smartDVrs.forEach((candidate) => syllabified.push(this.splitInSyllables(candidate)));
+
+
+        return syllabified;
+
+    }
+
+    //
+    //
+    check(w) {
+
+        return true;
+    }
+
+    //
+    //
+    mutateSyllableAndCheck(syllable) {
+
+
+        return syllable;
+    }
+
+    //
+    //
+    correct(word = word.toLowerCase(), start = performance.now()) {
+
+        let candidates = [];
+        let checkpool = [];
+        let variations = this.makeVariations(word);
+
+        if (this.check(word)) { this.printTime(start); return true; }
+
+        for (let index = 0; index < variations.length; index++) {
+
+            let vr = variations[index];
+            if (this.check(vr)) { candidates.push(vr); continue; }
+
+            vr.forEach((syllable) => {
+
+                if (this.mutateSyllableAndCheck(syllable))
+                    NaN;
+            })
+
+        }
+
+        candidates = [...candidates, ...checkpool.filter((w) => this.check(w))];
+        console.log(candidates);
+    }
 
 }
 
