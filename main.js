@@ -4,6 +4,10 @@ class coreFunctions {
     //
     minSimilarity = 0.7;
 
+    dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/dictionaryC.txt";
+
+    dictData = '';
+
     // Vowels used to better clasification
     vowels = ['a', 'e', 'o', 'u', 'i', '$'];
 
@@ -50,6 +54,41 @@ class coreFunctions {
     isValid = val => val !== undefined && val !== "" && val !== null && val !== "undefined";
     replaceCharAt = (str, pos, char) => str.slice(0, pos) + char + str.slice(pos + 1);
     splitArrayAt = (arr, pos) => [arr.slice(0, pos), arr.slice(pos)];
+
+    //
+    //
+    dictionaryLoad(url) {
+
+        const ok = r => (r.ok ? r : Promise.reject(new Error(`Failed: ${r.status} ${r.statusText}`)));
+        const set = t => (this.dictData = t, t);
+
+        const isB64 = s => /^[A-Za-z0-9+/=\s]+$/.test(s) && (s.replace(/\s+/g, "").length % 4 === 0);
+        const fromB64 = s => {
+            const bin = atob(s.replace(/\s+/g, ""));
+            const out = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+            return out;
+        };
+        const fromBin = s => {
+            const out = new Uint8Array(s.length);
+            for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 255;
+            return out;
+        };
+        const toBytes = s => (isB64(s) ? fromB64(s) : fromBin(s));
+        const gunzip = bytes => {
+            const ds = new DecompressionStream("gzip");
+            const stream = new Response(bytes).body.pipeThrough(ds);
+            return new Response(stream).text();
+        };
+
+        return fetch(url)
+            .then(ok)
+            .then(r => r.text())
+            .then(s => gunzip(toBytes(s)))
+            .then(set)
+            .then(console.log("Dictionary loaded!"));
+    }
+
 
     //
     //Litle  helper to measure code exec time
@@ -340,6 +379,7 @@ class magikEspellCheck extends Syllabifier {
 
     constructor() {
         super();
+        this.dictionaryLoad(this.dictionaryUrl)
     }
 
     //
