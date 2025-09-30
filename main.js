@@ -6,7 +6,8 @@ class coreFunctions {
 
     dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/dictionaryC.txt";
 
-    dictData = '';
+    dictData; dictMapped = new Map(); dictMapped_set = new Map();
+
 
     // Vowels used to better clasification
     vowels = ['a', 'e', 'o', 'u', 'i', '$'];
@@ -60,7 +61,7 @@ class coreFunctions {
     dictionaryLoad(url) {
 
         const ok = r => (r.ok ? r : Promise.reject(new Error(`Failed: ${r.status} ${r.statusText}`)));
-        const set = t => (this.dictData = t, t);
+        const set = t => (this.dictData = t, t && this.prepareDict());
 
         const isB64 = s => /^[A-Za-z0-9+/=\s]+$/.test(s) && (s.replace(/\s+/g, "").length % 4 === 0);
         const fromB64 = s => {
@@ -85,8 +86,7 @@ class coreFunctions {
             .then(ok)
             .then(r => r.text())
             .then(s => gunzip(toBytes(s)))
-            .then(set)
-            .then(console.log("Dictionary loaded!"));
+            .then(set);
     }
 
 
@@ -274,11 +274,7 @@ class coreFunctionsExt extends coreFunctions {
 //
 class Syllabifier extends coreFunctionsExt {
 
-    constructor() {
-        super();
-        // Avoid user's cold start; priming cache with an example word is optional
-        this.splitInSyllables("produccionando")
-    }
+    constructor() { super(); }
 
     SyllableHasValidEnding(lastLetterLastlastS, lastLastS) {
 
@@ -379,7 +375,9 @@ class magikEspellCheck extends Syllabifier {
 
     constructor() {
         super();
-        this.dictionaryLoad(this.dictionaryUrl)
+        this.dictionaryLoad(this.dictionaryUrl);
+        // Avoid user's cold start; priming cache with an example word is optional
+        this.splitInSyllables("produccionando");
     }
 
     //
@@ -468,6 +466,17 @@ class magikEspellCheck extends Syllabifier {
 
 
         return syllabified;
+
+    }
+
+    //
+    //
+    prepareDict() {
+
+        this.dictData = this.dictData.split(",");
+        this.dictData[this.dictData.length - 1] = this.dictData.at(-1).replace("'", "").trim();
+        this.dictData[0] = this.dictData[0].replace("'", "").trim();
+
 
     }
 
