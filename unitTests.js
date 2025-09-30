@@ -176,7 +176,7 @@ const test = () => {
                 ["peine", ["pei", "ne"]],
                 ["boina", ["boi", "na"]],
                 ["laurel", ["lau", "rel"]],
-                ["Europa", ["eu", "ro", "pa"]],
+                ["europa", ["eu", "ro", "pa"]],
                 ["causa", ["cau", "sa"]],
                 ["viuda", ["viu", "da"]],
                 ["pingüino", ["pin", "güi", "no"]],
@@ -192,7 +192,7 @@ const test = () => {
                 ["río", ["rí", "o"]],
                 ["oír", ["o", "ír"]],
                 ["prohíbe", ["pro", "hí", "be"]],
-                ["Raúl", ["ra", "úl"]],
+                ["raúl", ["ra", "úl"]],
                 ["caía", ["ca", "í", "a"]],
                 ["reúno", ["re", "ú", "no"]],
             ], (word, expected) => expectSyllables(word, expected));
@@ -203,7 +203,7 @@ const test = () => {
             testEach([
                 ["buey", ["buey"]],
                 ["miau", ["miau"]],
-                ["Uruguayo", ["u", "ru", "gua", "yo"]],
+                ["uruguayo", ["u", "ru", "gua", "yo"]],
                 ["averigüéis", ["a", "ve", "ri", "güéis"]],
             ], (word, expected) => expectSyllables(word, expected));
         });
@@ -231,7 +231,7 @@ const test = () => {
                 ["escuela", ["es", "cue", "la"]],
                 ["esqueleto", ["es", "que", "le", "to"]],
                 ["estruendo", ["es", "truen", "do"]],
-                ["España", ["es", "pa", "ña"]],
+                ["españa", ["es", "pa", "ña"]],
             ], (word, expected) => expectSyllables(word, expected));
         });
 
@@ -393,7 +393,7 @@ const test = () => {
         ["muy", ["muy"]],
         ["ley", ["ley"]],
         ["reyes", ["re", "yes"]],
-        ["Uruguay", ["u", "ru", "guay"]],
+        ["uruguay", ["u", "ru", "guay"]],
         ["baúl", ["ba", "úl"]],
         ["paella", ["pa", "e", "lla"]],
         ["prohíbo", ["pro", "hí", "bo"]],
@@ -414,11 +414,11 @@ const test = () => {
         ["adscripción", ["ads", "crip", "ción"]],
         ["obstrucción", ["obs", "truc", "ción"]],
         ["construir", ["cons", "truir"]],
-        ["Madrid", ["ma", "drid"]],
-        ["Barcelona", ["bar", "ce", "lo", "na"]],
-        ["Sevilla", ["se", "vi", "lla"]],
-        ["Zaragoza", ["za", "ra", "go", "za"]],
-        ["Valencia", ["va", "len", "cia"]],
+        ["madrid", ["ma", "drid"]],
+        ["barcelona", ["bar", "ce", "lo", "na"]],
+        ["sevilla", ["se", "vi", "lla"]],
+        ["zaragoza", ["za", "ra", "go", "za"]],
+        ["valencia", ["va", "len", "cia"]],
         ["animal", ["a", "ni", "mal"]],
         ["hospital", ["hos", "pi", "tal"]],
         ["metal", ["me", "tal"]],
