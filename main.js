@@ -6,8 +6,7 @@ class coreFunctions {
 
     dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/dictionaryC.txt";
 
-    dictData; dictMapped = new Map(); dictMapped_set = new Map();
-
+    dictData; dictMapped = new Map();
 
     // Vowels used to better clasification
     vowels = ['a', 'e', 'o', 'u', 'i', '$'];
@@ -92,11 +91,11 @@ class coreFunctions {
 
     //
     //Litle  helper to measure code exec time
-    printTime(start) {
+    printTime(start, msg = "miScript:", fixed = 2) {
 
         const end = performance.now();
         const seconds = (end - start) / 1000;
-        console.log("miScript:", seconds.toFixed(4), " segs");
+        console.log(msg, seconds.toFixed(fixed), " segs");
     }
 
     //
@@ -461,11 +460,7 @@ class magikEspellCheck extends Syllabifier {
     makeVariations(word) {
 
         let smartDVrs = this.smartDivide(word), syllabified = [];
-
-        smartDVrs.forEach((candidate) => syllabified.push(this.splitInSyllables(candidate)));
-
-
-        return syllabified;
+        return smartDVrs;
 
     }
 
@@ -477,49 +472,114 @@ class magikEspellCheck extends Syllabifier {
         this.dictData[this.dictData.length - 1] = this.dictData.at(-1).replace("'", "").trim();
         this.dictData[0] = this.dictData[0].replace("'", "").trim();
 
+        this.dictData.forEach((word) => {
+
+            const f2c = word.slice(0, 2);
+            const fw = f2c.slice(0, 1);
+            const wl = word.length;
+
+            // If first level (a, b ,c ... [first letter]) is undef for this word, we make it
+            if (!this.dictMapped.has(`${fw}`))
+                this.dictMapped.set(`${fw}`, new Map());
+
+            // If second level for this word (ab, ac, ad... [first 2 letters]) is also undef we made it
+            if (!this.dictMapped.get(`${fw}`).has(`${f2c}`))
+                this.dictMapped.get(`${fw}`).set(`${f2c}`, new Map())
+
+            // If third level for this word (1,2,3... [word length]) is also undef we made it
+            // last level is a set for faster search
+            if (!this.dictMapped.get(`${fw}`).get(`${f2c}`).has(`${wl}`))
+                this.dictMapped.get(`${fw}`).get(`${f2c}`).set(`${wl}`, new Set());
+
+            // Storing word in set...
+            this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${wl}`).add(word);
+
+
+        })
+        console.log("Dictionary fully loaded");
+    }
+
+    //
+    //
+    getSet(word) {
+
+        const f2c = word.slice(0, 2);
+        const fw = f2c.slice(0, 1);
+        const wl = word.length;
+
+        if (!this.dictMapped.has(`${fw}`))
+            return false;
+
+        if (!this.dictMapped.get(`${fw}`).has(`${f2c}`))
+            return false;
+
+        if (!this.dictMapped.get(`${fw}`).get(`${f2c}`).has(`${wl}`))
+            return false;
+
+        return this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${wl}`);
 
     }
 
     //
     //
-    check(w) {
+    check(word, /*start = performance.now()*/) {
 
+        let set = this.getSet(word);
+
+        if (!set || !set.has(word)) { /*this.printTime(start, "check time", 5);*/ return false; }
+
+        //this.printTime(start, "check time", 5);
         return true;
     }
 
     //
     //
-    mutateSyllableAndCheck(syllable) {
+    mutateSyllableAndCheck(syllable, word, wIndex) {
 
+        let missedLettersVr = [],
+            finalCandidates = [],
+            candidate = word;
 
-        return syllable;
+        for (let index = 0; index < syllable.length; index++) {
+
+            let addedLetterVr = this.replaceCharAt(syllable, index, "");
+            candidate[wIndex] = addedLetterVr;
+
+            if (this.check(candidate.join("")))
+                finalCandidates.push(candidate.join(""))
+
+        }
+
+        return finalCandidates;
     }
 
     //
     //
     correct(word = word.toLowerCase(), start = performance.now()) {
 
+        if (this.check(word)) { this.printTime(start); return true; }
+
         let candidates = [];
         let checkpool = [];
-        let variations = this.makeVariations(word);
-
-        if (this.check(word)) { this.printTime(start); return true; }
+        let variations = this.makeVariations(word).filter((a, b) => a !== b);
 
         for (let index = 0; index < variations.length; index++) {
 
             let vr = variations[index];
             if (this.check(vr)) { candidates.push(vr); continue; }
 
-            vr.forEach((syllable) => {
+            this.splitInSyllables(vr).some((syllable, i) => {
 
-                if (this.mutateSyllableAndCheck(syllable))
-                    NaN;
+                let candidate = this.mutateSyllableAndCheck(syllable, (this.splitInSyllables(vr)), i);
+                if (!!candidate) { candidates.push(candidate); return true; }
             })
 
         }
 
         candidates = [...candidates, ...checkpool.filter((w) => this.check(w))];
         console.log(candidates);
+
+        this.printTime(start);
     }
 
 }
