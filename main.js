@@ -675,10 +675,11 @@ class magikEspellCheck extends Syllabifier {
         if (this.check(word)) { this.printTime(start); return true; }
 
         let candidates = this.generateCandidates(word);
+        console.log(candidates);
         let suggestions = this.generateSuggestions(candidates);
 
         console.log(suggestions);
-        this.printTime(start);
+        this.printTime(start, "TIEMPO DE EJEC (EN SEGS) ", 4);
     }
 
 }
