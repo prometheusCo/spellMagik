@@ -400,7 +400,7 @@ class magikEspellCheck extends Syllabifier {
 
             const is2FV = this.isF2Valid(cn1 + c0);
 
-            if (this.getEst(c0) !== "V" && this.isValidSyllable(cn1 + "i" + c1) && this.getEst(cn1 + c0) !== "VV"
+            if (this.getEst(c0) !== "V" && this.isValidSyllable(cn1 + "$" + c1) && this.getEst(cn1 + c0) !== "VV"
                 && this.getEst(cn2 + cn1) !== "VV" && !is2FV)
                 chars = this.replaceCharAt(chars, index, "$");
 
