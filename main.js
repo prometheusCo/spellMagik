@@ -44,7 +44,7 @@ class coreFunctions {
 
 
     // Used to determine if a syllable is misspelled by looking at it's ending letters
-    invalidSyllablesEndings = new Set(["k", "g", "c", "x", "f"]);
+    invalidSyllablesEndings = new Set(["k", "g", "c", "x", "f", "d"]);
 
     invalidSyllablesEndingsExceptions = new Set(["ac", "oc", "ec", "ic", "ag", "ex"]);
     //
@@ -529,7 +529,6 @@ class magikEspellCheck extends Syllabifier {
             (acc, group) => acc.flatMap(prefix => group.map(syll => prefix + syll)),
             ['']
         );
-
     }
 
     //
@@ -575,9 +574,9 @@ class magikEspellCheck extends Syllabifier {
             if (this.check(syllable, true)) return [syllable];
             let syllablesComb = [];
 
-            for (let index = 0; index < syllable.length; index++) {
+            console.log("syllable => " + syllable);
 
-                const c0 = syllable[0];
+            for (let index = 0; index < syllable.length; index++) {
 
                 //Generating combinations removing a letter
                 this.check(syllable.slice(0, index + 1) + syllable.slice(index + 2), true)
@@ -623,14 +622,17 @@ class magikEspellCheck extends Syllabifier {
         ];
 
         //const regex = new RegExp(candidate.replace(/\$/g, this.vowels));
-
         candidates.forEach((candidate) => {
 
-            if (candidate.slice(0, 2).indexOf("$") == 1) {
+            if (candidate[1] === "$") {
 
                 vowels.forEach((v, i) => { _candidates.push(this.replaceCharAt(candidate, 1, v)) });
                 return;
             }
+
+            if (!candidate.slice(0, 2).includes("#") && !candidate.slice(0, 2).includes("$"))
+                _candidates.push(candidate);
+
             consonants.forEach((c, i) => { _candidates.push(this.replaceCharAt(candidate, 1, c)) });
         })
 
@@ -651,16 +653,15 @@ class magikEspellCheck extends Syllabifier {
                     return;
 
                 if (candidate.indexOf("$") >= 0) {
-                    const regex = new RegExp(candidate.replace(/\$/g, `[${vowels.join("")}]`));
+                    const regex = new RegExp(candidate.replaceAll(/\$/g, `[${vowels.join("")}]`));
                     groupSet.forEach((word) => { regex.test(word) ? finalCandidates.push(word) : null; })
                 }
 
                 if (candidate.indexOf("#") < 0)
                     return;
 
-                const regex = new RegExp(candidate.replace(/\$/g, `[${consonants.join("")}]`));
+                const regex = new RegExp(candidate.replaceAll(/\$/g, `[${consonants.join("")}]`));
                 groupSet.forEach((word) => { regex.test(word) ? finalCandidates.push(word) : null; })
-
 
             })
         })
@@ -675,7 +676,6 @@ class magikEspellCheck extends Syllabifier {
         if (this.check(word)) { this.printTime(start); return true; }
 
         let candidates = this.generateCandidates(word);
-        console.log(candidates);
         let suggestions = this.generateSuggestions(candidates);
 
         console.log(suggestions);
