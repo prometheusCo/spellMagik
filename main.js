@@ -9,20 +9,19 @@ class coreFunctions {
     dictData; dictMapped = new Map();
 
     // Vowels used to better clasification
-    vowels = ['a', 'e', 'o', 'u', 'i', '$'];
+    vowels = new Set(['a', 'e', 'o', 'u', 'i', '$']);
 
     // Consonants types  used for ruling out of syllables
-    plosives = ["PC", "p", "t", "k", "b", "d", "g", "#"];
-    fricatives = ["FC", "f", "s", "j", "z", "#"];
-    affricates = ["AFC", "ch", "#"];
-    nasals = ["NC", "m", "n", "ñ", "#"];
-    laterals = ["LC", "l", "ll", "#"];
-    approximants = ["AC", "b", "x", "#"];
-    vibrants = ["BC", "r", "rr", "#"];
-
+    plosives = new Set(["PC", "p", "t", "k", "b", "d", "g", "#"]);
+    fricatives = new Set(["FC", "f", "s", "j", "z", "#"]);
+    affricates = new Set(["AFC", "ch", "#"]);
+    nasals = new Set(["NC", "m", "n", "ñ", "#"]);
+    laterals = new Set(["LC", "l", "ll", "#"]);
+    approximants = new Set(["AC", "b", "x", "#"]);
+    vibrants = new Set(["BC", "r", "rr", "#"]);
 
     // Used to rule in valid vocals joins
-    diphthongsAndtriphthongs = [
+    diphthongsAndtriphthongs = new Set([
         "ia", "ie", "io", 'uei',
         "ua", "ue", "uo", "ió",
         "ai", "ei", "oi",
@@ -30,21 +29,21 @@ class coreFunctions {
         "iu", "ui", "ai",
         "üi", "üe", "üa",
         "üé", "uí", "üí"
-    ];
+    ]);
 
     // Valid two-consonant ONSET clusters by consonant (sound) TYPE
-    valid2CSounds = [
+    valid2CSounds = new Set([
         "PCLC", // pl, bl, cl, gl
         "PCBC", // pr, br, tr, dr, cr, gr
         "FCBC", // fr
         "FCLC",
-    ];
+    ]);
 
 
     // Used to determine if a syllable is misspelled by looking at it's ending letters
-    invalidSyllablesEndings = ["k", "g", "c", "x"];
+    invalidSyllablesEndings = new Set(["k", "g", "c", "x"]);
 
-    invalidSyllablesEndingsExceptions = ["ac", "oc", "ec", "ic", "ag", "ex"]
+    invalidSyllablesEndingsExceptions = new Set(["ac", "oc", "ec", "ic", "ag", "ex"]);
     //
     // Simple one-liner helpers
     clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
@@ -102,7 +101,7 @@ class coreFunctions {
 
         if (!this.isValid(word)) return "";
         word = this.clean(word)
-        let r = word.split("").map((a) => this.vowels.includes(a) ? "V" : "C");
+        let r = word.split("").map((a) => this.vowels.has(a) ? "V" : "C");
         if (returnType === "string")
             return r.join("");
 
@@ -154,6 +153,7 @@ class coreFunctions {
     // 
     reverseSearch(word, array, loose = false) {
 
+        array = [...array];
         let r = false;
         array.some((a) => {
             if ((word.indexOf(a) >= 0 && loose && this.pos(a.length - word.length) <= 1) || (word === a)) {
@@ -198,13 +198,13 @@ class coreFunctionsExt extends coreFunctions {
                 return "PC";
             }
 
-            if (this.plosives.includes(wordAsArray[index])) return this.plosives[0];
-            if (this.fricatives.includes(wordAsArray[index])) return this.fricatives[0];
-            if (this.affricates.includes(wordAsArray[index])) return this.affricates[0];
-            if (this.nasals.includes(wordAsArray[index])) return this.nasals[0];
-            if (this.laterals.includes(wordAsArray[index])) return this.laterals[0];
-            if (this.approximants.includes(wordAsArray[index])) return this.approximants[0];
-            if (this.vibrants.includes(wordAsArray[index])) return this.vibrants[0];
+            if (this.plosives.has(wordAsArray[index])) return [...this.plosives][0];
+            if (this.fricatives.has(wordAsArray[index])) return [...this.fricatives][0];
+            if (this.affricates.has(wordAsArray[index])) return [...this.affricates][0];
+            if (this.nasals.has(wordAsArray[index])) return [...this.nasals][0];
+            if (this.laterals.has(wordAsArray[index])) return [...this.laterals][0];
+            if (this.approximants.has(wordAsArray[index])) return [...this.approximants][0];
+            if (this.vibrants.has(wordAsArray[index])) return [...this.vibrants][0];
 
             return "C";
         });
@@ -233,7 +233,7 @@ class coreFunctionsExt extends coreFunctions {
             return true;
 
         // Otherwise we  test the current sound patter to those allowed in spanish (for the firs 2C)
-        return this.valid2CSounds.includes(est);
+        return this.valid2CSounds.has(est);
     }
 
     //
@@ -254,8 +254,8 @@ class coreFunctionsExt extends coreFunctions {
         if (syllableEst.slice(0, 3) === "CCC")
             return false;
 
-        let hasInvalidEnding = this.invalidSyllablesEndings.includes(syllableEnding);
-        let hasEndingExceps = this.invalidSyllablesEndingsExceptions.includes(syllable.slice(length - 2));
+        let hasInvalidEnding = this.invalidSyllablesEndings.has(syllableEnding);
+        let hasEndingExceps = this.invalidSyllablesEndingsExceptions.has(syllable.slice(length - 2));
 
         if (!(syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" || syllableEst === "CVC")
             || (hasInvalidEnding && !hasEndingExceps))
@@ -275,7 +275,7 @@ class Syllabifier extends coreFunctionsExt {
 
     SyllableHasValidEnding(lastLetterLastlastS, lastLastS) {
 
-        if (this.forbiddenEnds.includes(lastLetterLastlastS) && !this.forbiddenEndsExc.includes(this.clean(lastLetterLastlastS)))
+        if (this.forbiddenEnds.has(lastLetterLastlastS) && !this.forbiddenEndsExc.has(this.clean(lastLetterLastlastS)))
             return false;
         return true;
     }
@@ -429,8 +429,8 @@ class magikEspellCheck extends Syllabifier {
             const c1 = chars[index + 1] ?? false;
             const c2 = chars[index + 2] ?? false;
 
-            if (this.getEst(c0 + c1) === "VV" && !this.diphthongsAndtriphthongs.includes(c0 + c1) &&
-                !this.diphthongsAndtriphthongs.includes(cn1 + c0) && this.getEst(c0 + c1 + c2) !== "VVV") {
+            if (this.getEst(c0 + c1) === "VV" && !this.diphthongsAndtriphthongs.has(c0 + c1) &&
+                !this.diphthongsAndtriphthongs.has(cn1 + c0) && this.getEst(c0 + c1 + c2) !== "VVV") {
                 chars = this.replaceCharAt(chars, index, "#");
             }
 
