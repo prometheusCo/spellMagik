@@ -20,8 +20,6 @@ class coreFunctions {
     approximants = ["AC", "b", "x", "#"];
     vibrants = ["BC", "r", "rr", "#"];
 
-    consonantsTypes = ["PC", "FC", "NC", "LC", "AC", "BC"]
-
 
     // Used to rule in valid vocals joins
     diphthongsAndtriphthongs = [
@@ -387,7 +385,6 @@ class magikEspellCheck extends Syllabifier {
         let syllablesC = syllables; // String copy to use in vowels replacing
         let estS = this.getEst(syllables.replaceAll(/,/g, ""));
 
-
         //
         // main method loop helper 
         const vowelsLogicApply = (chars, index) => {
@@ -504,16 +501,10 @@ class magikEspellCheck extends Syllabifier {
     getSet(word) {
 
         const f2c = word.slice(0, 2);
-        const fw = f2c.slice(0, 1);
+        const fw = f2c[0];
         const wl = word.length;
 
-        if (!this.dictMapped.has(`${fw}`))
-            return false;
-
-        if (!this.dictMapped.get(`${fw}`).has(`${f2c}`))
-            return false;
-
-        if (!this.dictMapped.get(`${fw}`).get(`${f2c}`).has(`${wl}`))
+        if (!this.dictMapped.get(`${fw}`).has(`${f2c}`) || !this.dictMapped.get(`${fw}`).get(`${f2c}`).has(`${wl}`))
             return false;
 
         return this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${wl}`);
@@ -534,23 +525,12 @@ class magikEspellCheck extends Syllabifier {
 
     //
     //
-    mutateSyllableAndCheck(syllable, word, wIndex) {
+    generateCandidates(word) {
 
-        let missedLettersVr = [],
-            finalCandidates = [],
-            candidate = word;
+        let candidates = [];
 
-        for (let index = 0; index < syllable.length; index++) {
 
-            let addedLetterVr = this.replaceCharAt(syllable, index, "");
-            candidate[wIndex] = addedLetterVr;
-
-            if (this.check(candidate.join("")))
-                finalCandidates.push(candidate.join(""))
-
-        }
-
-        return finalCandidates;
+        return candidates;
     }
 
     //
@@ -559,25 +539,8 @@ class magikEspellCheck extends Syllabifier {
 
         if (this.check(word)) { this.printTime(start); return true; }
 
-        let candidates = [];
-        let checkpool = [];
-        let variations = this.makeVariations(word).filter((a, b) => a !== b);
+        let suggestions = [];
 
-        for (let index = 0; index < variations.length; index++) {
-
-            let vr = variations[index];
-            if (this.check(vr)) { candidates.push(vr); continue; }
-
-            this.splitInSyllables(vr).some((syllable, i) => {
-
-                let candidate = this.mutateSyllableAndCheck(syllable, (this.splitInSyllables(vr)), i);
-                if (!!candidate) { candidates.push(candidate); return true; }
-            })
-
-        }
-
-        candidates = [...candidates, ...checkpool.filter((w) => this.check(w))];
-        console.log(candidates);
 
         this.printTime(start);
     }
