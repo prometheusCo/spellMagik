@@ -4,6 +4,9 @@ class coreFunctions {
     //
     minSimilarity = 0.7;
 
+    //
+    epochs = 10;
+
     dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/dictionaryC.txt";
 
     dictData; dictMapped = new Map();
@@ -41,7 +44,7 @@ class coreFunctions {
 
 
     // Used to determine if a syllable is misspelled by looking at it's ending letters
-    invalidSyllablesEndings = new Set(["k", "g", "c", "x"]);
+    invalidSyllablesEndings = new Set(["k", "g", "c", "x", "f"]);
 
     invalidSyllablesEndingsExceptions = new Set(["ac", "oc", "ec", "ic", "ag", "ex"]);
     //
@@ -51,7 +54,7 @@ class coreFunctions {
     isValid = val => val !== undefined && val !== "" && val !== null && val !== "undefined";
     replaceCharAt = (str, pos, char) => str.slice(0, pos) + char + str.slice(pos + 1);
     splitArrayAt = (arr, pos) => [arr.slice(0, pos), arr.slice(pos)];
-
+    insertChar = (y, x, c) => y.slice(0, x + 1) + c + y.slice(x + 1);
     //
     //
     dictionaryLoad(url) {
@@ -383,7 +386,6 @@ class magikEspellCheck extends Syllabifier {
 
         let syllables = word;
         let syllablesC = syllables; // String copy to use in vowels replacing
-        let estS = this.getEst(syllables.replaceAll(/,/g, ""));
 
         //
         // main method loop helper 
@@ -448,17 +450,7 @@ class magikEspellCheck extends Syllabifier {
             syllablesC = consonantsLogicApply(syllablesC, index);
 
         }
-
-        return [syllables, syllablesC];
-    }
-
-    //
-    //
-    makeVariations(word) {
-
-        let smartDVrs = this.smartDivide(word), syllabified = [];
-        return smartDVrs;
-
+        return [...new Set([syllables, syllablesC])];
     }
 
     //
@@ -513,14 +505,63 @@ class magikEspellCheck extends Syllabifier {
 
     //
     //
-    check(word, /*start = performance.now()*/) {
+    check(word, onlyCheckSyllables = false) {
+
+
+        if (onlyCheckSyllables) {
+            let r = this.splitInSyllables(word).some((s) => !this.isValidSyllable(s));
+            return !r;
+        }
 
         let set = this.getSet(word);
+        if (!set || !set.has(word))
+            return false;
 
-        if (!set || !set.has(word)) { /*this.printTime(start, "check time", 5);*/ return false; }
-
-        //this.printTime(start, "check time", 5);
         return true;
+    }
+
+    //
+    //
+    variationsMerge(matrix) {
+
+        console.log(matrix);
+        return matrix.reduce(
+            (acc, group) => acc.flatMap(prefix => group.map(syll => prefix + syll)),
+            ['']
+        );
+
+    }
+
+    //
+    //
+
+    groupWords(arr) {
+
+        return arr
+            .sort((a, b) => a.length - b.length || a.localeCompare(b))
+            .reduce((groups, word) => {
+                const key = word.slice(0, 2) + "_" + word.length;
+                let group = groups.find(g => g.key === key);
+                if (!group) {
+                    group = { key, words: [] };
+                    groups.push(group);
+                }
+                group.words.push(word);
+                return groups;
+            }, [])
+            .map(g => g.words);
+    }
+
+    //
+    //
+    variationsMerge(arr) {
+
+        if (arr[0].length === 0) return undefined;
+
+        return arr.reduce(
+            (acc, group) => acc.flatMap(prefix => group.map(syll => prefix + syll)),
+            [""]
+        );
     }
 
     //
@@ -529,8 +570,102 @@ class magikEspellCheck extends Syllabifier {
 
         let candidates = [];
 
+        const testPatterns = (syllable) => {
 
+            if (this.check(syllable, true)) return [syllable];
+            let syllablesComb = [];
+
+            for (let index = 0; index < syllable.length; index++) {
+
+                const c0 = syllable[0];
+
+                //Generating combinations removing a letter
+                this.check(syllable.slice(0, index + 1) + syllable.slice(index + 2), true)
+                    ? syllablesComb.push(syllable.slice(0, index + 1) + syllable.slice(index + 2)) : null;
+
+                //... Adding placeholder for wovels
+                this.check(this.insertChar(syllable, index, "$"), true)
+                    ? syllablesComb.push(this.insertChar(syllable, index, "$")) : null;
+
+                //... Adding placeholder for consontants
+                this.check(this.insertChar(syllable, index, "#"), true)
+                    ? syllablesComb.push(this.insertChar(syllable, index, "#")) : null;
+
+            }
+            return syllablesComb;
+        }
+
+        let smartD = this.smartDivide(word).filter((a, b) => a !== b);
+
+        smartD.forEach((smartCand) => { this.check(smartCand, true) ? candidates.push(smartCand) : null })
+        smartD = smartD.filter((c) => !candidates.includes(c))
+
+        smartD = smartD.map((c) => {
+
+            let syllables = this.splitInSyllables(c);
+            syllables = syllables.map((s) => testPatterns(s));
+            return this.variationsMerge(syllables);
+        })
+
+        smartD.filter((a) => a !== undefined).forEach((a) => { a.forEach((b) => { candidates.push(b); }) });
         return candidates;
+    }
+
+    //
+    //
+    generateSuggestions(candidates) {
+
+        let finalCandidates = [], _candidatesGrouped, _candidates = [];
+        const vowels = ["a", "e", "i", "o", "u"];
+        const consonants = [
+            "b", "c", "d", "f", "g", "h", "j", "k", "l", "m", "n", "ñ",
+            "p", "q", "r", "s", "t", "v", "w", "x", "y", "z"
+        ];
+
+        //const regex = new RegExp(candidate.replace(/\$/g, this.vowels));
+
+        candidates.forEach((candidate) => {
+
+            if (candidate.slice(0, 2).indexOf("$") == 1) {
+
+                vowels.forEach((v, i) => { _candidates.push(this.replaceCharAt(candidate, 1, v)) });
+                return;
+            }
+            consonants.forEach((c, i) => { _candidates.push(this.replaceCharAt(candidate, 1, c)) });
+        })
+
+        _candidates.forEach((a) => { this.check(a) ? finalCandidates.push(a) : null })
+        _candidates = _candidates.filter((c) => !finalCandidates.includes(c));
+
+        _candidatesGrouped = this.groupWords(_candidates);
+        _candidatesGrouped.forEach((candidateGroup, gIndex) => {
+
+            let isSet = this.getSet(candidateGroup[0]);
+            if (!isSet) return;
+
+            let groupSet = [...isSet];
+
+            candidateGroup.forEach((candidate) => {
+
+                if (candidate.indexOf("#") < 0 && candidate.indexOf("$") < 0)
+                    return;
+
+                if (candidate.indexOf("$") >= 0) {
+                    const regex = new RegExp(candidate.replace(/\$/g, `[${vowels.join("")}]`));
+                    groupSet.forEach((word) => { regex.test(word) ? finalCandidates.push(word) : null; })
+                }
+
+                if (candidate.indexOf("#") < 0)
+                    return;
+
+                const regex = new RegExp(candidate.replace(/\$/g, `[${consonants.join("")}]`));
+                groupSet.forEach((word) => { regex.test(word) ? finalCandidates.push(word) : null; })
+
+
+            })
+        })
+
+        return finalCandidates;
     }
 
     //
@@ -539,9 +674,10 @@ class magikEspellCheck extends Syllabifier {
 
         if (this.check(word)) { this.printTime(start); return true; }
 
-        let suggestions = [];
+        let candidates = this.generateCandidates(word);
+        let suggestions = this.generateSuggestions(candidates);
 
-
+        console.log(suggestions);
         this.printTime(start);
     }
 
