@@ -44,9 +44,14 @@ class coreFunctions {
 
 
     // Used to determine if a syllable is misspelled by looking at it's ending letters
-    invalidSyllablesEndings = new Set(["k", "g", "c", "x", "f", "d"]);
-
+    invalidSyllablesEndings = new Set(["k", "g", "c", "x", "f"]);
     invalidSyllablesEndingsExceptions = new Set(["ac", "oc", "ec", "ic", "ag", "ex"]);
+
+    // Used to know if we must go a litle further on the heuristic syllable generation
+    // This set won't invalidate a syllable but it will force the program to look for another
+    // valid mutation in case this result in an invalid word creation
+    suspiciousStarts = new Set(["w"]);
+
     //
     // Simple one-liner helpers
     clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
@@ -507,7 +512,7 @@ class magikEspellCheck extends Syllabifier {
     //
     check(word, onlyCheckSyllables = false) {
 
-
+        //This checks each syllables estructure 
         if (onlyCheckSyllables) {
             let r = this.splitInSyllables(word).some((s) => !this.isValidSyllable(s));
             return !r;
@@ -524,7 +529,6 @@ class magikEspellCheck extends Syllabifier {
     //
     variationsMerge(matrix) {
 
-        console.log(matrix);
         return matrix.reduce(
             (acc, group) => acc.flatMap(prefix => group.map(syll => prefix + syll)),
             ['']
@@ -533,7 +537,6 @@ class magikEspellCheck extends Syllabifier {
 
     //
     //
-
     groupWords(arr) {
 
         return arr
@@ -565,30 +568,53 @@ class magikEspellCheck extends Syllabifier {
 
     //
     //
+    singleCharReplace = (syllable, index, syllablesComb) => {
+        console.log(syllable);
+
+        //Generating combinations removing a letter
+        this.isValidSyllable(syllable.slice(0, index + 1) + syllable.slice(index + 2))
+            ? syllablesComb.push(syllable.slice(0, index + 1) + syllable.slice(index + 2)) : null;
+
+        //... Adding placeholder for wovels
+        this.isValidSyllable(this.insertChar(syllable, index, "$"))
+            ? syllablesComb.push(this.insertChar(syllable, index, "$")) : null;
+
+        //... Adding placeholder for consontants
+        this.isValidSyllable(syllable, index, "#")
+            ? syllablesComb.push(this.insertChar(syllable, index, "#")) : null;
+
+    }
+    //
+    doubleCharReplace = (syllable, index, syllablesComb) => {
+
+        if (syllable.slice(index + 1) == "")
+            return;
+
+        let test = this.insertChar(syllable, index, "#"); test = this.insertChar(test, index + 2, "#");
+        this.isValidSyllable(test) ? syllablesComb.push(test) : null;
+
+        test = this.insertChar(syllable, index, "$"); test = this.insertChar(test, index + 2, "$");
+        this.isValidSyllable(test) ? syllablesComb.push(test) : null;
+
+    }
+
+    //
+    //
     generateCandidates(word) {
 
         let candidates = [];
 
         const testPatterns = (syllable) => {
 
-            if (this.check(syllable, true)) return [syllable];
+            if (this.isValidSyllable(syllable)) return [syllable];
             let syllablesComb = [];
 
             console.log("syllable => " + syllable);
 
             for (let index = 0; index < syllable.length; index++) {
 
-                //Generating combinations removing a letter
-                this.check(syllable.slice(0, index + 1) + syllable.slice(index + 2), true)
-                    ? syllablesComb.push(syllable.slice(0, index + 1) + syllable.slice(index + 2)) : null;
-
-                //... Adding placeholder for wovels
-                this.check(this.insertChar(syllable, index, "$"), true)
-                    ? syllablesComb.push(this.insertChar(syllable, index, "$")) : null;
-
-                //... Adding placeholder for consontants
-                this.check(this.insertChar(syllable, index, "#"), true)
-                    ? syllablesComb.push(this.insertChar(syllable, index, "#")) : null;
+                this.singleCharReplace(syllable, index, syllablesComb);
+                this.doubleCharReplace(syllable, index, syllablesComb);
 
             }
             return syllablesComb;
@@ -599,6 +625,7 @@ class magikEspellCheck extends Syllabifier {
         smartD.forEach((smartCand) => { this.check(smartCand, true) ? candidates.push(smartCand) : null })
         smartD = smartD.filter((c) => !candidates.includes(c))
 
+        console.log(smartD);
         smartD = smartD.map((c) => {
 
             let syllables = this.splitInSyllables(c);
