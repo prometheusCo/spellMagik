@@ -693,7 +693,6 @@ class magikEspellCheck extends Syllabifier {
 
             return vm.filter((s) => this.check(s, true));
         })
-        console.log(smartD)
         smartD.filter((a) => a !== undefined).forEach((a) => { a.forEach((b) => { candidates.push(b); }) });
         return candidates;
     }
@@ -726,8 +725,6 @@ class magikEspellCheck extends Syllabifier {
                 candidates = [...candidates, ..._candidates]
             })
 
-            console.log("========")
-            console.log(candidates.join(" , "))
             cont++;
         }
         return suggestions;
@@ -737,7 +734,6 @@ class magikEspellCheck extends Syllabifier {
     //
     generateSuggestions(candidates) {
 
-        console.log("==> " + candidates)
         let finalCandidates = [], _candidatesGrouped, _candidates = [];
         const vowels = ["a", "e", "i", "o", "u"];
         const consonants = [
@@ -760,33 +756,22 @@ class magikEspellCheck extends Syllabifier {
 
         _candidates.forEach((a) => { this.check(a) ? finalCandidates.push(a) : null })
         _candidates = _candidates.filter((c) => !finalCandidates.includes(c) && this.check(c, true));
-
-
-        console.log("==== candidates===")
-        console.log(_candidates);
-
         _candidatesGrouped = this.groupWords(_candidates);
-
-        console.log("==== grouped candidates===")
-        console.log(_candidatesGrouped);
 
         _candidatesGrouped.forEach((candidateGroup, gIndex) => {
 
             let isSet = this.getSet(candidateGroup[0]);
-            console.log("set => " + candidateGroup[0] + " => " + isSet)
             if (!isSet) return;
 
             let groupSet = [...isSet];
 
             candidateGroup.forEach((candidate) => {
 
-                console.log(candidate);
                 if (candidate.indexOf("#") < 0 && candidate.indexOf("$") < 0)
                     return;
 
                 if (candidate.indexOf("$") >= 0) {
                     const regex = new RegExp(candidate.replaceAll(/\$/g, `[${vowels.join("")}]`));
-                    console.log(regex)
                     groupSet.forEach((word) => { regex.test(word) ? finalCandidates.push(word) : null; })
                 }
 
