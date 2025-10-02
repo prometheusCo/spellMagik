@@ -710,7 +710,6 @@ class magikEspellCheck extends Syllabifier {
 
         while (suggestions.length === 0 && cont < this.epochs) {
 
-
             let skipFalse = cont < 1 ? false : true;
             let toLoop = [...candidates]; candidates = [];
 
