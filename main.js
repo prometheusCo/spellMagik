@@ -20,27 +20,12 @@ class coreFunctions {
     approximants = new Set(["AC", "b", "x", "#"]);
     vibrants = new Set(["BC", "r", "rr", "#"]);
 
-    // Used to rule in valid vocals joins
-    diphthongsAndtriphthongs = new Set([
-        "ia", "ie", "io", 'uei',
-        "ua", "ue", "uo", "ió",
-        "ai", "ei", "oi",
-        "au", "eu", "ou",
-        "iu", "ui", "ai",
-        "üi", "üe", "üa",
-        "üé", "uí", "üí"
-    ]);
 
     diphthongsAndTriphthongs = new Set([
-        // Diphthongs (combinations of weak + strong or strong + weak vowels)
         "ai", "au", "ei", "eu", "oi", "ou", "ia", "ie", "io", "ua", "ue", "uo",
-        "iu", "ui",
-
-        // Diphthongs with diaeresis (ü) for pronunciation
-        "üi", "üe", "üa",
-
-        // Triphthongs (three-vowel combinations forming one syllable)
-        "uai", "uei", "iai", "iei", "ioi", "uoi", "iái", "uéi", "uió"
+        "iu", "ui", "uí",
+        "üi", "üe", "üa", "üei",
+        "uai", "uei", "iai", "iei", "ioi", "uoi", "iái", "uéi", "uió", "ió"
     ]);
 
 
@@ -58,11 +43,12 @@ class coreFunctions {
 
     // Used to determine if a syllable is misspelled by looking at it's ending letters
     invalidSyllablesEndings = new Set(["k", "g", "c", "x", "f", "d", "v"]);
+
     // Letter that form an exception to list above
     invalidSyllablesEndingsExceptions = new Set(["ac", "oc", "ec", "ic", "ag", "ex", "ed"]);
 
     // Invalid word's starts that makes a syllable be considered misspelled
-    invalidStarts = new Set(["ki", "qi", "vr"]);
+    invalidStarts = new Set(["ki", "qi", "vr", "ko"]);
 
     // Used to know if we must go a litle further on the heuristic syllable generation
     // This set won't invalidate a syllable but it will force the program to look for another
@@ -80,6 +66,17 @@ class coreFunctions {
     isTwoLettersSounds = ll => this.twoLettersSounds.has(ll);
     //
     //
+
+    //
+    //
+    hasValidEnding(str) {
+
+        if (this.invalidSyllablesEndingsExceptions.has(str.slice(-2)) || !this.invalidSyllablesEndings.has(str.slice(-1)))
+            return true;
+
+        return false;
+    }
+
 
     dictionaryLoad(url) {
 
@@ -211,7 +208,10 @@ class coreFunctions {
 
 class coreFunctionsExt extends coreFunctions {
 
-    constructor() { super(); }
+    constructor() {
+        super();
+        this.complexV = this.diphthongsAndTriphthongs;
+    }
     //
     // Given a word, return its V/C structure BUT annotating consonant type (PC, FC, etc.)
     getEstExt(word, returnType = "array") {
@@ -286,12 +286,16 @@ class coreFunctionsExt extends coreFunctions {
         if (syllableEst.slice(0, 3) === "CCC")
             return false;
 
-        let hasInvalidEnding = this.invalidSyllablesEndings.has(syllableEnding);
-        let hasEndingExceps = this.invalidSyllablesEndingsExceptions.has(syllable.slice(length - 2));
+        let hasInvalidEnding = !this.hasValidEnding(syllable)
         let is2fv = this.isF2Valid(syllable);
 
+        console.log(this.diphthongsAndtriphthongs)
+
+        if (!!this.reverseSearch(syllable, this.complexV, true) && (syllableEst === "CVV" || syllableEst === "VVC"))
+            return true;
+
         if (!is2fv && !(syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" || syllableEst === "CVC")
-            || (hasInvalidEnding && !hasEndingExceps))
+            || (hasInvalidEnding))
             return false;
 
         return is2fv;
@@ -348,7 +352,7 @@ class Syllabifier extends coreFunctionsExt {
 
         // No syllable can be a single consonant.
         // If last letter of previous syllable + first of current syllable form a diphthong, join them.
-        if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongsAndtriphthongs, true)))
+        if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.complexV, true)))
             this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
         // Final cleanup
@@ -412,8 +416,6 @@ class magikEspellCheck extends Syllabifier {
     constructor() {
 
         super();
-        this.ogSillabifier = this.splitInSyllables;
-
         this.dictionaryLoad(this.dictionaryUrl);
         // Avoid user's cold start; priming cache with an example word is optional
 
@@ -521,44 +523,115 @@ class magikEspellCheck extends Syllabifier {
 
     //
     //
-    advancedRulesAplly(syllable) {
+    advancedRulesApllyVowels(_syllable) {
 
-        if (this.getEst(syllable).slice(0, 3) === "CCC")
-            syllable = this.replaceCharAt(syllable, 1, "$")
+        let syllable = _syllable;
+        let V2F = this.isF2Valid(syllable),
+            F3C = syllable.slice(0, 3),
+            prevInsert = V2F ? syllable[1] : "",
+            makeTest = prev => this.replaceCharAt(syllable, 1, prev + "$"),
+            exp = /[#|$]/;
+
+        if (this.getEst(F3C) === "CCC" && this.isValidSyllable(makeTest(prevInsert)))
+            syllable = makeTest(prevInsert);
+
+        let test = syllable[0] + "$" + syllable[1] + syllable[2];
+        if (this.getEst(syllable) === "CCV" && !V2F && this.isValidSyllable(test) && syllable[1] !== "$")
+            syllable = test;
+
+        if (!this.hasValidEnding(syllable) && spell.isValidSyllable(syllable + "$"))
+            syllable = syllable + "$";
+
+        if (this.getEst(syllable) == "CC" && !V2F)
+            syllable = syllable[0] + "$" + syllable[1];
 
 
         return syllable;
+    }
+
+    advancedRulesApllyConsonants(_syllable) {
+
+
+        return _syllable;
     }
 
     //
     //
     splitInSyllables(_syllables) {
 
-        let syllables = super.splitInSyllables(_syllables), epochs = 0;
+        let syllables = super.splitInSyllables(_syllables);
+        let ogSyllabifier = new Syllabifier();
+        let epochs = 0, hasValidSyllables = false;
 
         if (this.check(syllables, true))
             return syllables;
 
+        while (epochs < this.epochs && !hasValidSyllables) {
 
-        syllables.forEach((s, index) => {
+            [...syllables].forEach((s, index) => {
 
-            if (this.isValidSyllable(s))
-                return;
-            s = this.rulesApply(this.advancedRulesAplly(s));
+                if (this.isValidSyllable(s))
+                    return;
+                s = this.advancedRulesApllyVowels(s);
 
-            if (this.isValidSyllable(s))
-                syllables[index] = s;
-        })
+                if (this.isValidSyllable(s))
+                    syllables[index] = s;
+            })
 
+            if (this.check(syllables.join(""), true))
+                hasValidSyllables = true;
+
+            syllables = ogSyllabifier.splitInSyllables(syllables.join(""))
+            epochs++;
+        }
         return syllables;
     }
 
+    //
+    //
+    randomSMutate(s) {
+
+        if (!s || this.isValidSyllable(s))
+            return s;
+
+        console.log("entry => " + s);
+
+        for (let y = 0; y < s.length; y++) {
+
+            console.log(this.replaceCharAt(s, y, ""))
+            if (this.isValidSyllable(this.replaceCharAt(s, y, "")))
+                return this.replaceCharAt(s, y, "");
+        }
+
+        return s;
+    }
 
     //
     //
     generateMutations(word) {
 
+        let mutations = [];
+        let newArr = (arr, pos) => arr.filter((_, i) => i !== pos);
 
+        let basicM = this.splitInSyllables(word);
+
+        basicM.forEach((syllable, index) => {
+
+            let test = newArr(basicM, index);
+            if (this.check(test, true)) { mutations.push(test); return; }
+
+            test.forEach((t, tIndex) => {
+                test[tIndex] = this.randomSMutate(t);
+
+                if (this.check(test, true))
+                    mutations.push(test);
+
+            })
+
+        })
+
+        mutations = [...mutations, [...basicM]];
+        return mutations;
     }
 
     //

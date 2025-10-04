@@ -68,7 +68,8 @@
 
 // ---- Guard: require global syllabify ----
 function syllabify(w) {
-    return spell.splitInSyllables(w);
+    let n = new Syllabifier()
+    return n.splitInSyllables(w);
 }
 if (typeof syllabify !== "function") {
     throw new Error("Missing global function `syllabify(word)`. Define it before running the tests.");
