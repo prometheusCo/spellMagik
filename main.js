@@ -306,7 +306,7 @@ class coreFunctionsExt extends coreFunctions {
 
 class Syllabifier extends coreFunctionsExt {
 
-    constructor() { super(); }
+    constructor() { super(); this.rulesIsWorking = false; }
 
     SyllableHasValidEnding(lastLetterLastlastS, lastLastS) {
 
@@ -319,8 +319,6 @@ class Syllabifier extends coreFunctionsExt {
     // Heuristic rules to help the main loop split into syllables more accurately
     //
     rulesApply = (syllables) => {
-
-        console.log(syllables);
 
         const lastS = syllables[syllables.length - 1];
         const lastLastS = syllables[syllables.length - 2] ?? false;
@@ -357,48 +355,6 @@ class Syllabifier extends coreFunctionsExt {
         return typeof syllables === "object" ? syllables.filter((s) => s !== "") : syllables;
     }
 
-    //
-    //
-    advancedRulesAplly(syllable) {
-
-        if (this.getEst(syllable).slice(0, 3) === "CCC")
-            syllable = this.replaceCharAt(syllable, 1, "$")
-
-
-        return syllable;
-    }
-
-    //
-    //
-    #rulesApplyLoop(_syllables) {
-
-        let syllables = this.rulesApply(_syllables), cont = 0;
-
-        if (this.check(syllables, true))
-            return syllables;
-
-        while (cont < this.epochs && !this.check(syllables, true)) {
-
-            if (cont >= this.epochs)
-                break;
-
-            syllables.forEach((s, index) => {
-
-                if (this.isValidSyllable(s))
-                    return;
-                s = this.rulesApply(this.advancedRulesAplly(s));
-
-                if (this.isValidSyllable(s))
-                    syllables[index] = s;
-            })
-
-            syllables = this.splitInSyllables(syllables.join(""));
-            cont++;
-
-        }
-
-        return syllables;
-    }
 
     //  
     // Heuristic syllable splitter
@@ -433,12 +389,12 @@ class Syllabifier extends coreFunctionsExt {
 
                 tmpAdd(currentLetter);
                 if (index === end) emptyPush();
-                syllables.length > 0 ? syllables = this.#rulesApplyLoop(syllables) : null;
+                syllables.length > 0 ? syllables = this.rulesApply(syllables) : null;
                 continue;
             }
 
             tmpPush(currentLetter);
-            syllables = this.#rulesApplyLoop(syllables);
+            syllables = this.rulesApply(syllables);
         }
         return syllables;
     }
@@ -454,9 +410,13 @@ class Syllabifier extends coreFunctionsExt {
 class magikEspellCheck extends Syllabifier {
 
     constructor() {
+
         super();
+        this.ogSillabifier = this.splitInSyllables;
+
         this.dictionaryLoad(this.dictionaryUrl);
         // Avoid user's cold start; priming cache with an example word is optional
+
     }
 
     //
@@ -559,6 +519,63 @@ class magikEspellCheck extends Syllabifier {
         return true;
     }
 
+    //
+    //
+    advancedRulesAplly(syllable) {
+
+        if (this.getEst(syllable).slice(0, 3) === "CCC")
+            syllable = this.replaceCharAt(syllable, 1, "$")
+
+
+        return syllable;
+    }
+
+    //
+    //
+    splitInSyllables(_syllables) {
+
+        let syllables = super.splitInSyllables(_syllables), epochs = 0;
+
+        if (this.check(syllables, true))
+            return syllables;
+
+
+        syllables.forEach((s, index) => {
+
+            if (this.isValidSyllable(s))
+                return;
+            s = this.rulesApply(this.advancedRulesAplly(s));
+
+            if (this.isValidSyllable(s))
+                syllables[index] = s;
+        })
+
+        return syllables;
+    }
+
+
+    //
+    //
+    generateMutations(word) {
+
+
+    }
+
+    //
+    //
+    correct(word, start = performance.now()) {
+
+        word = word.toLowerCase();
+
+        if (this.check(word))
+            return true;
+
+        let mutations = this.generateMutations(word)
+        let suggestions = mutations;
+
+        console.log(suggestions)
+        this.printTime(start, " EXEC TIME", 10);
+    }
 
 }
 
