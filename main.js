@@ -620,11 +620,10 @@ class magikEspellCheck extends Syllabifier {
             if (this.check(test, true)) { mutations.push(test); return; }
 
             test.forEach((t, tIndex) => {
-                test[tIndex] = this.randomSMutate(t);
 
+                test[tIndex] = this.randomSMutate(t);
                 if (this.check(test, true))
                     mutations.push(test);
-
             })
 
         })
