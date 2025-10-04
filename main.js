@@ -1,11 +1,6 @@
 // Core utility methods
 class coreFunctions {
 
-    //
-    minSimilarity = 0.7;
-
-    //
-    epochs = 3;
 
     dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/dictionaryC.txt";
 
@@ -34,13 +29,18 @@ class coreFunctions {
         "üé", "uí", "üí"
     ]);
 
-    // Valid two-consonant ONSET clusters by consonant (sound) TYPE
-    valid2CSounds = new Set([
-        "PCLC", // pl, bl, cl, gl
-        "PCBC", // pr, br, tr, dr, cr, gr
-        "FCBC", // fr
-        "FCLC",
+    diphthongsAndTriphthongs = new Set([
+        // Diphthongs (combinations of weak + strong or strong + weak vowels)
+        "ai", "au", "ei", "eu", "oi", "ou", "ia", "ie", "io", "ua", "ue", "uo",
+        "iu", "ui",
+
+        // Diphthongs with diaeresis (ü) for pronunciation
+        "üi", "üe", "üa",
+
+        // Triphthongs (three-vowel combinations forming one syllable)
+        "uai", "uei", "iai", "iei", "ioi", "uoi", "iái", "uéi", "uió"
     ]);
+
 
     //
     twoLettersSounds = new Set(["rr", "ll", "ch"]);
@@ -469,7 +469,6 @@ class magikEspellCheck extends Syllabifier {
                 return this.replaceCharAt(chars, index + 1, "$");
 
 
-
             return chars;
         }
 
@@ -584,16 +583,6 @@ class magikEspellCheck extends Syllabifier {
 
     //
     //
-    variationsMerge(matrix) {
-
-        return matrix.reduce(
-            (acc, group) => acc.flatMap(prefix => group.map(syll => prefix + syll)),
-            ['']
-        );
-    }
-
-    //
-    //
     groupWords(arr) {
 
         return arr
@@ -623,179 +612,7 @@ class magikEspellCheck extends Syllabifier {
         );
     }
 
-    //
-    //
-    singleCharReplace = (syllable, index, syllablesComb) => {
 
-        //Generating combinations removing a letter at a time
-        this.isValidSyllable(syllable.slice(0, index + 1) + syllable.slice(index + 2))
-            ? syllablesComb.push(syllable.slice(0, index + 1) + syllable.slice(index + 2)) : null;
-
-        //... Adding placeholder for wovels a letter at a time
-        this.isValidSyllable(this.insertChar(syllable, index, "$"))
-            ? syllablesComb.push(this.insertChar(syllable, index, "$")) : null;
-
-        //... Adding placeholder for consontants a letter at a time
-        this.isValidSyllable(syllable, index, "#")
-            ? syllablesComb.push(this.insertChar(syllable, index, "#")) : null;
-
-    }
-    //
-    doubleCharReplace = (syllable, index, syllablesComb) => {
-
-        if (syllable.slice(index + 1) == "")
-            return;
-
-        //Generating combinations by adding 2 consonants placeholders at a time, with a char long of diff
-        let test = this.insertChar(syllable, index, "#"); test = this.insertChar(test, index + 2, "#");
-        this.isValidSyllable(test) ? syllablesComb.push(test) : null;
-
-        //Generating combinations by adding 2 vowels placeholders at a time, with a char long of diff
-        test = this.insertChar(syllable, index, "$"); test = this.insertChar(test, index + 2, "$");
-        this.isValidSyllable(test) ? syllablesComb.push(test) : null;
-
-        //Generating combinations by adding a placeholder ($) and removing a char
-        test = this.insertChar(syllable, index, "$"); test = this.replaceCharAt(test, index + 2, "");
-        this.isValidSyllable(test) ? syllablesComb.push(test) : null;
-
-    }
-
-    //
-    //
-    generateCandidates(word, skipFalse = false) {
-
-        let candidates = [];
-
-        const testPatterns = (syllable) => {
-
-            if (this.isValidSyllable(syllable) && !skipFalse) return [syllable];
-            let syllablesComb = [];
-
-            for (let index = 0; index < syllable.length; index++) {
-
-                this.singleCharReplace(syllable, index, syllablesComb);
-                this.doubleCharReplace(syllable, index, syllablesComb);
-
-            }
-            return syllablesComb;
-        }
-
-        let smartD = this.smartDivide(word);
-
-        smartD.forEach((smartCand) => { this.check(smartCand, true) ? candidates.push(smartCand) : null })
-        smartD = smartD.filter((c) => !candidates.includes(c))
-
-        smartD = smartD.map((c) => {
-
-            let syllables = this.splitInSyllables(c);
-            syllables = syllables.map((s) => testPatterns(s));
-            let vm = this.variationsMerge(syllables);
-
-            return vm.filter((s) => this.check(s, true));
-        })
-        smartD.filter((a) => a !== undefined).forEach((a) => { a.forEach((b) => { candidates.push(b); }) });
-        return candidates;
-    }
-
-    //
-    //
-    generateCandidatesLoop(word) {
-
-        let cont = 0, suggestions = [];
-        let candidates = this.generateCandidates(word);
-        suggestions = this.generateSuggestions(candidates)
-
-        if (suggestions.length > 0)
-            return suggestions;
-
-        while (suggestions.length === 0 && cont < this.epochs) {
-
-            let skipFalse = cont < 1 ? false : true;
-            let toLoop = [...candidates]; candidates = [];
-
-            toLoop.some((_word) => {
-
-                let _candidates = this.generateCandidates(_word);
-                suggestions = this.generateSuggestions(_candidates)
-
-                if (suggestions.length > 0)
-                    return true;
-
-                candidates = [...candidates, ..._candidates]
-            })
-
-            cont++;
-        }
-        return suggestions;
-    }
-
-    //
-    //
-    generateSuggestions(candidates) {
-
-        let finalCandidates = [], _candidatesGrouped, _candidates = [];
-        const vowels = ["a", "e", "i", "o", "u"];
-        const consonants = [
-            "b", "c", "d", "f", "g", "h", "j", "k", "l", "m", "n", "ñ",
-            "p", "q", "r", "s", "t", "v", "w", "x", "y", "z"
-        ];
-
-        //const regex = new RegExp(candidate.replace(/\$/g, this.vowels));
-        candidates.forEach((candidate) => {
-
-            if (candidate[1] === "$") {
-                vowels.forEach((v, i) => { _candidates.push(this.replaceCharAt(candidate, 1, v)) });
-                return;
-            }
-            if (!candidate.slice(0, 2).includes("#") && !candidate.slice(0, 2).includes("$"))
-                _candidates.push(candidate);
-
-            consonants.forEach((c, i) => { _candidates.push(this.replaceCharAt(candidate, 1, c)) });
-        })
-
-        _candidates.forEach((a) => { this.check(a) ? finalCandidates.push(a) : null })
-        _candidates = _candidates.filter((c) => !finalCandidates.includes(c) && this.check(c, true));
-        _candidatesGrouped = this.groupWords(_candidates);
-
-        _candidatesGrouped.forEach((candidateGroup, gIndex) => {
-
-            let isSet = this.getSet(candidateGroup[0]);
-            if (!isSet) return;
-
-            let groupSet = [...isSet];
-
-            candidateGroup.forEach((candidate) => {
-
-                if (candidate.indexOf("#") < 0 && candidate.indexOf("$") < 0)
-                    return;
-
-                if (candidate.indexOf("$") >= 0) {
-                    const regex = new RegExp(candidate.replaceAll(/\$/g, `[${vowels.join("")}]`));
-                    groupSet.forEach((word) => { regex.test(word) ? finalCandidates.push(word) : null; })
-                }
-
-                if (candidate.indexOf("#") < 0)
-                    return;
-
-                const regex = new RegExp(candidate.replaceAll(/\$/g, `[${consonants.join("")}]`));
-                groupSet.forEach((word) => { regex.test(word) ? finalCandidates.push(word) : null; })
-
-            })
-        })
-
-        return finalCandidates;
-    }
-
-    //
-    //
-    correct(word = word.toLowerCase(), start = performance.now()) {
-
-        if (this.check(word)) { this.printTime(start); return true; }
-
-        let suggestions = this.generateCandidatesLoop(word);
-        console.log(suggestions);
-        this.printTime(start, "TIEMPO DE EJEC (EN SEGS) ", 4);
-    }
 
 }
 
