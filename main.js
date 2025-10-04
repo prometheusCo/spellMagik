@@ -21,12 +21,17 @@ class coreFunctions {
     vibrants = new Set(["BC", "r", "rr", "#"]);
 
 
-    diphthongsAndTriphthongs = new Set([
-        "ai", "au", "ei", "eu", "oi", "ou", "ia", "ie", "io", "ua", "ue", "uo",
-        "iu", "ui", "uí",
-        "üi", "üe", "üa", "üei",
-        "uai", "uei", "iai", "iei", "ioi", "uoi", "iái", "uéi", "uió", "ió"
-    ]);
+
+    // Used to rule in valid vocals joins
+    diphthongsAndtriphthongs = [
+        "ia", "ie", "io", 'uei',
+        "ua", "ue", "uo", "ió",
+        "ai", "ei", "oi",
+        "au", "eu", "ou",
+        "iu", "ui", "ai",
+        "üi", "üe", "üa",
+        "üé", "uí", "üí"
+    ];
 
 
     // Valid two-consonant ONSET clusters by consonant (sound) TYPE
@@ -48,7 +53,7 @@ class coreFunctions {
     invalidSyllablesEndingsExceptions = new Set(["ac", "oc", "ec", "ic", "ag", "ex", "ed"]);
 
     // Invalid word's starts that makes a syllable be considered misspelled
-    invalidStarts = new Set(["ki", "qi", "vr", "ko"]);
+    invalidStarts = new Set(["ki", "qi", "vr", "ko", "st"]);
 
     // Used to know if we must go a litle further on the heuristic syllable generation
     // This set won't invalidate a syllable but it will force the program to look for another
@@ -210,7 +215,6 @@ class coreFunctionsExt extends coreFunctions {
 
     constructor() {
         super();
-        this.complexV = this.diphthongsAndTriphthongs;
     }
     //
     // Given a word, return its V/C structure BUT annotating consonant type (PC, FC, etc.)
@@ -289,9 +293,7 @@ class coreFunctionsExt extends coreFunctions {
         let hasInvalidEnding = !this.hasValidEnding(syllable)
         let is2fv = this.isF2Valid(syllable);
 
-        console.log(this.diphthongsAndtriphthongs)
-
-        if (!!this.reverseSearch(syllable, this.complexV, true) && (syllableEst === "CVV" || syllableEst === "VVC"))
+        if (!!this.reverseSearch(syllable, this.diphthongsAndtriphthongs, true) && (syllableEst === "CVV" || syllableEst === "VVC"))
             return true;
 
         if (!is2fv && !(syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" || syllableEst === "CVC")
@@ -310,7 +312,7 @@ class coreFunctionsExt extends coreFunctions {
 
 class Syllabifier extends coreFunctionsExt {
 
-    constructor() { super(); this.rulesIsWorking = false; }
+    constructor() { super(); }
 
     SyllableHasValidEnding(lastLetterLastlastS, lastLastS) {
 
@@ -352,7 +354,7 @@ class Syllabifier extends coreFunctionsExt {
 
         // No syllable can be a single consonant.
         // If last letter of previous syllable + first of current syllable form a diphthong, join them.
-        if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.complexV, true)))
+        if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongsAndtriphthongs, true)))
             this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
         // Final cleanup
@@ -400,7 +402,7 @@ class Syllabifier extends coreFunctionsExt {
             tmpPush(currentLetter);
             syllables = this.rulesApply(syllables);
         }
-        return syllables;
+        return this.rulesApply(syllables);
     }
 
 }
@@ -594,11 +596,8 @@ class magikEspellCheck extends Syllabifier {
         if (!s || this.isValidSyllable(s))
             return s;
 
-        console.log("entry => " + s);
-
         for (let y = 0; y < s.length; y++) {
 
-            console.log(this.replaceCharAt(s, y, ""))
             if (this.isValidSyllable(this.replaceCharAt(s, y, "")))
                 return this.replaceCharAt(s, y, "");
         }
