@@ -6,6 +6,8 @@ class coreFunctions {
 
     dictData; dictMapped = new Map();
 
+    epochs = 3;
+
     // Vowels used to better clasification
     vowels = new Set(['a', 'e', 'o', 'u', 'i', '$']);
 
@@ -44,6 +46,7 @@ class coreFunctions {
 
     // Valid two-consonant ONSET clusters by consonant (sound) TYPE
     valid2CSounds = new Set([
+
         "PCLC", // pl, bl, cl, gl
         "PCBC", // pr, br, tr, dr, cr, gr
         "FCBC", // fr
@@ -55,6 +58,7 @@ class coreFunctions {
 
     // Used to determine if a syllable is misspelled by looking at it's ending letters
     invalidSyllablesEndings = new Set(["k", "g", "c", "x", "f", "d", "v"]);
+    // Letter that form an exception to list above
     invalidSyllablesEndingsExceptions = new Set(["ac", "oc", "ec", "ic", "ag", "ex", "ed"]);
 
     // Invalid word's starts that makes a syllable be considered misspelled
@@ -76,6 +80,7 @@ class coreFunctions {
     isTwoLettersSounds = ll => this.twoLettersSounds.has(ll);
     //
     //
+
     dictionaryLoad(url) {
 
         const ok = r => (r.ok ? r : Promise.reject(new Error(`Failed: ${r.status} ${r.statusText}`)));
@@ -202,6 +207,8 @@ class coreFunctions {
 //
 // Core methods extension
 //
+//
+
 class coreFunctionsExt extends coreFunctions {
 
     constructor() { super(); }
@@ -295,6 +302,8 @@ class coreFunctionsExt extends coreFunctions {
 //
 // Syllabifier class
 //
+//
+
 class Syllabifier extends coreFunctionsExt {
 
     constructor() { super(); }
@@ -310,6 +319,8 @@ class Syllabifier extends coreFunctionsExt {
     // Heuristic rules to help the main loop split into syllables more accurately
     //
     rulesApply = (syllables) => {
+
+        console.log(syllables);
 
         const lastS = syllables[syllables.length - 1];
         const lastLastS = syllables[syllables.length - 2] ?? false;
@@ -343,12 +354,56 @@ class Syllabifier extends coreFunctionsExt {
             this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
         // Final cleanup
-        return syllables.filter((s) => s !== "");
+        return typeof syllables === "object" ? syllables.filter((s) => s !== "") : syllables;
+    }
+
+    //
+    //
+    advancedRulesAplly(syllable) {
+
+        if (this.getEst(syllable).slice(0, 3) === "CCC")
+            syllable = this.replaceCharAt(syllable, 1, "$")
+
+
+        return syllable;
+    }
+
+    //
+    //
+    #rulesApplyLoop(_syllables) {
+
+        let syllables = this.rulesApply(_syllables), cont = 0;
+
+        if (this.check(syllables, true))
+            return syllables;
+
+        while (cont < this.epochs && !this.check(syllables, true)) {
+
+            if (cont >= this.epochs)
+                break;
+
+            syllables.forEach((s, index) => {
+
+                if (this.isValidSyllable(s))
+                    return;
+                s = this.rulesApply(this.advancedRulesAplly(s));
+
+                if (this.isValidSyllable(s))
+                    syllables[index] = s;
+            })
+
+            syllables = this.splitInSyllables(syllables.join(""));
+            cont++;
+
+        }
+
+        return syllables;
     }
 
     //  
     // Heuristic syllable splitter
     //
+
     splitInSyllables(word) {
 
         let syllables = []; // Final syllables array; each element is one syllable
@@ -378,150 +433,31 @@ class Syllabifier extends coreFunctionsExt {
 
                 tmpAdd(currentLetter);
                 if (index === end) emptyPush();
-                syllables.length > 0 ? syllables = this.rulesApply(syllables) : null;
+                syllables.length > 0 ? syllables = this.#rulesApplyLoop(syllables) : null;
                 continue;
             }
 
             tmpPush(currentLetter);
-            syllables = this.rulesApply(syllables);
+            syllables = this.#rulesApplyLoop(syllables);
         }
-        return this.rulesApply(syllables);
+        return syllables;
     }
 
 }
 
 //
-// Class extension to the main Syllabifyer class, focused on syllabifying
-// misspelled words, using more complex heruistic rules
 //
+// Main spell checker class
+//
+//
+
 class magikEspellCheck extends Syllabifier {
 
     constructor() {
         super();
         this.dictionaryLoad(this.dictionaryUrl);
         // Avoid user's cold start; priming cache with an example word is optional
-        this.splitInSyllables("produccionando");
     }
-
-
-    //
-    // Applies syllabification heuristics to a misspelled word in order to infer
-    // where a vowel or a consonant should be inserted (or where a split occurs).
-    //
-    // Markers used by this routine (logical, not user-facing):
-    //   - "$" : suggested boundary/placeholder typically indicating a missing VOWEL
-    //           (e.g., a place where a vowel could be inserted or a syllable break
-    //           around consonant clusters).
-    //   - "#" : suggested boundary/placeholder typically indicating a missing
-    //
-
-    smartDivide(word) {
-
-        let syllables = word;
-        let syllablesC = syllables; // String copy to apply the consonant-oriented rules
-
-        //
-        // Helper: rules focused on VOWEL placement and consonant-cluster splits.
-
-        const vowelsLogicApply = (chars, index) => {
-
-            let cn1 = chars[index - 1] ?? false; // previous char
-            const cn2 = chars[index - 2] ?? false; // char two positions back
-
-            let c0 = chars[index] ?? "";           // current char
-            let currentEst = this.getEst(c0);             // current char simple Est 
-
-            const c1 = chars[index + 1] ?? false;  // next char
-            const c2 = chars[index + 2] ?? false;  // char two positions ahead
-
-            const is2FV = this.isF2Valid(cn1 + c0);           // valid CC onset/coda
-            const i2ls = this.isTwoLettersSounds(cn1 + c0);     // mandatory digraph
-
-            // Need sufficient left/right context to apply most rules
-            if (!cn2)
-                return chars;
-
-            const twoPrevCharsEst = this.getEst(cn2 + cn1); // To prev chars Est
-            const inmediatePrevEst = this.getEst(cn1 + c0); // las char + current Est
-
-            // If we reach the last char and last char isn't an S and prev char is a (C)
-            // We add a vowel 
-            if (!c1 && inmediatePrevEst === "CC" && c0 !== "s")
-                return this.replaceCharAt(chars, index, "$");
-
-            // If previous + current form a mandatory digraph (ll , rr,ch ...)
-            // we add a vowel rigth after digraph's end 
-            if (i2ls)
-                return this.replaceCharAt(chars, index + 1, "$");
-
-            // If current char is not a vowel and the pattern around it forms a valid
-            // type => (cn1 + "$" + c1)  we add $ to current index
-            // Exceptions: valid First 2 chars combo, digraphs,invalid starts for (CV) & probable dipthongs
-
-            if (currentEst == "C" && this.isValidSyllable(cn1 + "$" + c1) &&
-                inmediatePrevEst == "CC" && twoPrevCharsEst == "CC" && !is2FV)
-                return this.replaceCharAt(chars, index, "$");
-
-            if (!cn1)
-                return chars;
-
-            // If we detect a heavy cluster "VCCC" (likely needing a sustitution), and the
-            // immediate two-letter cluster is not a valid  2 FIRST LETTERS set, we replace $ at index
-            if (this.getEst(cn2 + cn1 + c0 + c1) === "VCCC" && !is2FV)
-                return this.replaceCharAt(chars, index, "$");
-
-            // If the two chars to the left form a valid CC and current is a vowel,
-            // prefer placing the split AFTER the vowel (index+1) to preserve the valid CC onset/coda.
-            if (this.isF2Valid(cn2 + cn1) && twoPrevCharsEst === "CC" && currentEst === "V")
-                return this.replaceCharAt(chars, index + 1, "$");
-
-
-            return chars;
-        }
-
-
-        //
-        // Helper: rules focused on CONSONANT placement and VV splitting.
-        // 
-
-        const consonantsLogicApply = (chars, index) => {
-
-            const cn1 = chars[index - 1] ?? false; // previous char (for digraph checks)
-            const cn2 = chars[index - 2] ?? false; // two back (context)
-
-            let c0 = chars[index] ?? "";           // current char
-            const c1 = chars[index + 1] ?? false;  // next char
-            const c2 = chars[index + 2] ?? false;  // two ahead (to detect "VVV")
-
-            // If we have "VV" at (c0,c1), it's NOT a known diphthong on either side,
-            // and the lookahead is not making it "VVV", then mark "#" at index to
-            // suggest a consonant insertion / split between the two vowels.
-
-            if (this.getEst(c0 + c1) === "VV" && !this.diphthongsAndtriphthongs.has(c0 + c1) &&
-                !this.diphthongsAndtriphthongs.has(cn1 + c0) && this.getEst(c0 + c1 + c2) !== "VVV") {
-                chars = this.replaceCharAt(chars, index, "#");
-            }
-
-            return chars;
-        }
-
-        //
-        // Main loop:
-        //   Apply the two complementary heuristics in parallel tracks:
-        //     - 'syllables'  : vowel-placement / consonant-cluster splits ("$")
-        //     - 'syllablesC' : consonant-placement / VV splitting ("#")
-
-        for (let index = 0; index < syllables.length; index++) {
-
-            console.log("syllables Entry => " + syllables)
-            syllables = vowelsLogicApply(syllables, index);
-            syllablesC = consonantsLogicApply(syllablesC, index);
-            console.log("syllables ouput => " + syllables)
-
-        }
-        return [...new Set([syllables, syllablesC])];
-    }
-
 
     //
     //
@@ -575,23 +511,6 @@ class magikEspellCheck extends Syllabifier {
 
     //
     //
-    check(word, onlyCheckSyllables = false) {
-
-        //This checks each syllables estructure 
-        if (onlyCheckSyllables) {
-            let r = this.splitInSyllables(word).some((s) => !this.isValidSyllable(s));
-            return !r;
-        }
-
-        let set = this.getSet(word);
-        if (!set || !set.has(word))
-            return false;
-
-        return true;
-    }
-
-    //
-    //
     groupWords(arr) {
 
         return arr
@@ -621,6 +540,24 @@ class magikEspellCheck extends Syllabifier {
         );
     }
 
+    //
+    //
+    check(word, onlyCheckSyllables = false) {
+
+        //This checks each syllables estructure 
+        if (onlyCheckSyllables) {
+
+            let sylls = typeof word === "object" ? word : word.split("");
+            let r = sylls.some((s) => !this.isValidSyllable(s));
+            return !r;
+        }
+
+        let set = this.getSet(word);
+        if (!set || !set.has(word))
+            return false;
+
+        return true;
+    }
 
 
 }
