@@ -107,7 +107,6 @@ class coreFunctions {
             .then(set);
     }
 
-
     //
     //Litle  helper to measure code exec time
     printTime(start, msg = "miScript:", fixed = 2) {
@@ -514,8 +513,10 @@ class magikEspellCheck extends Syllabifier {
 
         for (let index = 0; index < syllables.length; index++) {
 
+            console.log("syllables Entry => " + syllables)
             syllables = vowelsLogicApply(syllables, index);
             syllablesC = consonantsLogicApply(syllablesC, index);
+            console.log("syllables ouput => " + syllables)
 
         }
         return [...new Set([syllables, syllablesC])];
