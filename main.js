@@ -42,6 +42,14 @@ class coreFunctions {
     ]);
 
 
+    // Valid two-consonant ONSET clusters by consonant (sound) TYPE
+    valid2CSounds = new Set([
+        "PCLC", // pl, bl, cl, gl
+        "PCBC", // pr, br, tr, dr, cr, gr
+        "FCBC", // fr
+        "FCLC"
+    ]);
+
     //
     twoLettersSounds = new Set(["rr", "ll", "ch"]);
 
