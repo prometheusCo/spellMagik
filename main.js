@@ -142,6 +142,9 @@ class coreMethods {
     //
     dictionaryLoad(url) {
 
+        const loadedData = localStorage.getItem("magikEspellCheckDict");
+        if (this.isValid(loadedData)) { this.dictData = loadedData; this.prepareDict(); return; }
+
         const ok = r => (r.ok ? r : Promise.reject(new Error(`Failed: ${r.status} ${r.statusText}`)));
         const set = t => (this.dictData = t, t && this.prepareDict());
 
@@ -157,7 +160,9 @@ class coreMethods {
             for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 255;
             return out;
         };
+
         const toBytes = s => (isB64(s) ? fromB64(s) : fromBin(s));
+        const isGzip = bytes => bytes && bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
         const gunzip = bytes => {
             const ds = new DecompressionStream("gzip");
             const stream = new Response(bytes).body.pipeThrough(ds);
@@ -167,9 +172,13 @@ class coreMethods {
         return fetch(url)
             .then(ok)
             .then(r => r.text())
-            .then(s => gunzip(toBytes(s)))
+            .then(s => {
+                const bytes = toBytes(s);
+                return isGzip(bytes) ? gunzip(bytes) : s; // Skip gunzip if not compressed
+            })
             .then(set);
     }
+
 
     //
     //Litle  helper to measure code exec time
@@ -512,6 +521,7 @@ class magikEspellCheck extends Syllabifier {
 
         })
 
+        localStorage.setItem("magikEspellCheckDict", this.dictData)
         this.ready = true;
         this.dictData = null;
         this.warmStart ? this.correct("pkdmos") : null;
