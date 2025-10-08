@@ -375,8 +375,8 @@ class coreMethodsExt extends coreMethods {
         if (!!this.reverseSearch(syllable, this.diphthongsAndtriphthongs, true) && (syllableEst === "CVV" || syllableEst === "VVC"))
             return true;
 
-        if (!is2fv && !(syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" || syllableEst === "CVC")
-            || (hasInvalidEnding))
+        if (!is2fv && !(syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" ||
+            syllableEst === "CVC") || (hasInvalidEnding))
             return false;
 
         return is2fv;
