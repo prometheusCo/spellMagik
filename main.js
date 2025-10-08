@@ -122,7 +122,7 @@ class coreMethods {
     splitArrayAt = (arr, pos) => [arr.slice(0, pos), arr.slice(pos)];
     insertChar = (y, x, c) => y.slice(0, x + 1) + c + y.slice(x + 1);
     isTwoLettersSounds = ll => this.twoLettersSounds.has(ll);
-    hasSymbols = str => new RegExp(/[$|#]/).test(str);
+    hasSymbols = str => new RegExp(/[§|~]/).test(str);
     count = (arr, str) => [...arr].filter((a) => a.indexOf(str) >= 0).length
 
     //
@@ -717,15 +717,15 @@ class magikEspellCheck extends Syllabifier {
         }
 
         // WORD'S START VRS IF ANY
-        if (/[$|#]/.test(F2C)) {
+        if (/[§|~]/.test(F2C)) {
 
             F2C.indexOf(this.vowelsWildcard) >= 0 ? vowels.forEach((l) => { start.push(F2C.replace(this.vowelsWildcard, l)) })
                 : consonants.forEach((l) => { start.push(F2C.replace(this.consonantssWildcard, l)) });
         }
 
         // PATTERN END
-        if (end.search(/[$|#]/) >= 0)
-            end = end.slice(end.search(/[$|#]/))
+        if (end.search(/[§|~]/) >= 0)
+            end = end.slice(end.search(/[§|~]/))
 
         // PATTER MIDDLE
         middle = middle.slice(2, -(end.length))
@@ -737,7 +737,7 @@ class magikEspellCheck extends Syllabifier {
             for (let index = -2; index < 2; index++) {
 
                 let expReg = `${st}[a-z]{${(n + index)}}${end}`;
-                if (/[$|#]/.test(st))
+                if (/[§|~]/.test(st))
                     continue;
 
                 finalCandidates.push(expReg);
