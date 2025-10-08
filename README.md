@@ -11,9 +11,7 @@ It uses **syllable-based heuristics** and **phonetic rules** of Spanish to detec
 
 ## ✨ Features
 
-* **Fully Spanish-aware:** handles diphthongs, triphthongs, digraphs (*rr, ll, ch*), and legal consonant clusters.
-* **Smart syllabifier:** splits words into syllables and repairs boundary errors automatically.
-* **Heuristic suggestions:** uses vowel/consonant wildcards to guess likely words.
+* **Heuristic suggestions:** uses vowel/consonant rules and reg Exps to guess likely words.
 * **Weighted similarity:** custom edit distance tuned for Spanish spelling patterns.
 * **Offline cache:** dictionary loads once and stays in `localStorage`.
 * **Zero dependencies:** pure browser JavaScript.
@@ -40,9 +38,9 @@ const ok = spell.correct("hola", suggestions => {
 
 ## ⚙️ How It Works
 
-1. **Loads a dictionary** (plain, gzip, or base64) from the configured URL and caches it locally.
+1. **Loads a dictionary** (plain or  gzip) from the configured URL and caches it locally.
 2. **Splits input words** into syllables using phonetic and structural rules.
-3. **Generates candidate mutations** by swapping onsets, filling vowel/consonant wildcards, and testing nearby lengths.
+3. **Generates candidate mutations** using heuristic rules and reg Exp patterns.
 4. **Scores all candidates** with a weighted edit-distance function and returns the top matches.
 
 ---
