@@ -41,6 +41,10 @@ class coreMethods {
 
     stringDiff = 0.7;
 
+    maxNumSuggestions = 10;
+
+    warmStart = true;
+
     // Vowels used to better clasification
     weakVowels = ['i', 'u'];
     strongVowels = ['a', 'e', 'o']
@@ -97,6 +101,8 @@ class coreMethods {
     // This set won't invalidate a syllable but it will force the program to look for another
     // valid mutation in case this result in an invalid word creation
     suspiciousStarts = new Set(["w", "k"]);
+
+    noiseCache = new Set([]);
 
     //
     // Simple one-liner helpers
@@ -182,12 +188,19 @@ class coreMethods {
     //
     //
 
-    diffScoreStrings(a, b, weights = { ins: 0.7, del: 1.3, sub: 1.0 }) {
+    diffScoreStrings = (a, b, weights = { ins: 0.7, del: 1.3, sub: 1.0 }) => {
+
+        const vowels = 'aeiouAEIOU';
+        const isVowel = c => vowels.includes(c);
+        const isConsonant = c => /^[b-df-hj-np-tv-z]$/i.test(c);
+        const eq = (x, y) => (
+            x === y ? true :
+                (x === '$' && isVowel(y)) || (y === '$' && isVowel(x)) ? true :
+                    (x === '#' && isConsonant(y)) || (y === '#' && isConsonant(x))
+        );
 
         const m = a.length;
         const n = b.length;
-
-        // DP optimizado a 2 filas
         const [s, t] = m < n ? [a, b] : [b, a];
         const rows = s.length + 1;
         const cols = t.length + 1;
@@ -199,10 +212,10 @@ class coreMethods {
 
         for (let i = 1; i < rows; i++) {
             curr[0] = i * weights.del;
-            const si = s.charCodeAt(i - 1);
+            const si = s[i - 1];
             for (let j = 1; j < cols; j++) {
-                const tj = t.charCodeAt(j - 1);
-                const cost = si === tj ? 0 : weights.sub;
+                const tj = t[j - 1];
+                const cost = eq(si, tj) ? 0 : weights.sub;
                 const del = prev[j] + weights.del;
                 const ins = curr[j - 1] + weights.ins;
                 const sub = prev[j - 1] + cost;
@@ -214,10 +227,11 @@ class coreMethods {
         const distance = prev[cols - 1];
         const maxLen = Math.max(m, n) || 1;
         const worst = maxLen * Math.max(weights.ins, weights.del, weights.sub);
-
         const similarity = 1 - distance / worst;
-        return 0.1 + similarity * 0.89; // escala 0.1–0.99
-    }
+
+        return 0.1 + similarity * 0.89; // scaled 0.1–0.99
+    };
+
 
     //
     // Try to find a match for a `word` inside an `array`. If `loose` is false → only exact matches are found
@@ -491,6 +505,9 @@ class magikEspellCheck extends Syllabifier {
 
         })
 
+        if (this.warmStart) {
+            this.correct("pkdmos", true); this.warmStart = false;
+        }
         console.log("Dictionary fully loaded");
     }
 
@@ -663,33 +680,6 @@ class magikEspellCheck extends Syllabifier {
 
     //
     //
-    returnSuggestions(patterns, ogWord) {
-
-        //console.log(patterns)
-        let sugestions = [];
-        patterns.forEach((pattern) => {
-
-            let set = this.getSet(pattern.slice(0, 2));
-            if (!set) return;
-            let reg = new RegExp(pattern, "i")
-            let pool = [...set];
-            let ln = (pattern.split("[a-z]{").join("").length - 2) + parseInt(pattern.split("{")[1].split("}")[0]);
-
-            pool.forEach((w) => {
-
-                if (w.length !== ln || !reg.test(w) || spell.diffScoreStrings(ogWord, w) < this.stringDiff)
-                    return;
-
-                sugestions.push([w, spell.diffScoreStrings(ogWord, w)]);
-            })
-
-        })
-
-        return sugestions.sort((a, b) => b[1] - a[1]);
-    }
-
-    //
-    //
     generateMutations(word) {
 
         let candidate = this.splitInSyllables(word);
@@ -704,8 +694,13 @@ class magikEspellCheck extends Syllabifier {
         ]
 
         // STARTS IN V
-        if (this.isValidSyllable("$" + start[0][0])) {
+        if (this.getEst(start[0][0]) === "C") {
             vowels.forEach((l) => { start.push(l + start[0][0]) });
+        }
+
+        // STARTS IN C
+        if (this.getEst(start[0][0]) === "V" && this.isValidSyllable("#" + start[0][0])) {
+            consonants.forEach((l) => { start.push(l + start[0][0]) });
         }
 
         // STARTS  WITH SWAPPED LETTERS
@@ -731,7 +726,7 @@ class magikEspellCheck extends Syllabifier {
         start.forEach((st) => {
 
             let n = middle.length;
-            for (let index = -1; index < 1; index++) {
+            for (let index = -2; index < 2; index++) {
 
                 let expReg = `${st}[a-z]{${(n + index)}}${end}`;
                 if (/[$|#]/.test(st))
@@ -739,25 +734,58 @@ class magikEspellCheck extends Syllabifier {
 
                 finalCandidates.push(expReg);
             }
-
         })
         return finalCandidates;
     }
 
     //
     //
+    returnSuggestions(patterns, ogWord) {
+
+        let noiseCache = this.noiseCache;
+        let lastOgL = ogWord[ogWord.length - 1];
+
+        let sugestions = [];
+        patterns.forEach((pattern) => {
+
+            let set = this.getSet(pattern.slice(0, 2));
+            if (!set) return;
+            let reg = new RegExp(pattern, "i")
+            let pool = [...set];
+            let ln = (pattern.split("[a-z]{").join("").length - 2) + parseInt(pattern.split("{")[1].split("}")[0]);
+
+            pool.forEach((w) => {
+
+                if (noiseCache.has(w) || w.length !== ln || !reg.test(w)) return;
+
+                let score = spell.diffScoreStrings(ogWord, w);
+                if (score < this.stringDiff) return;
+
+                noiseCache.add(w);
+                sugestions.push([w, score]);
+            })
+        })
+        return sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
+    }
+
+    //
+    //
     correct(word, start = performance.now()) {
 
+        this.noiseCache = new Set([]);
         word = word.toLowerCase();
 
         if (this.check(word))
             return true;
 
-        let mutations = this.groupWords([this.generateMutations(word)]);
-        let suggestions = this.returnSuggestions(mutations[0][0], word);
+        let mutations = this.generateMutations(word)
+        let altMutations = this.generateMutations(this.cutUntilTrue(word)[1])
+        let sugestions = this.returnSuggestions([...mutations, ...altMutations], word);
 
-        console.log(suggestions)
-        this.printTime(start, " EXEC TIME", 10);
+        start && !this.warmStart ? this.printTime(start, " EXEC TIME", 10) : null;
+
+        if (!this.warmStart)
+            return sugestions;
     }
 
 }
