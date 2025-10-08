@@ -32,10 +32,11 @@
 // Core utility methods
 class coreMethods {
 
-
-    dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionaryC.txt";
-
     dictData; dictMapped = new Map();
+
+    //
+    //  CONF ZONE
+    dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionaryC.txt";
 
     epochs = 3;
 
@@ -45,20 +46,24 @@ class coreMethods {
 
     warmStart = true;
 
+    vowelsWildcard = "§";
+    consonantssWildcard = "~";
+
+    //
     // Vowels used to better clasification
     weakVowels = ['i', 'u'];
     strongVowels = ['a', 'e', 'o']
 
-    vowels = new Set([...this.weakVowels, ...this.strongVowels, ...["$"]]);
+    vowels = new Set([...this.weakVowels, ...this.strongVowels, ...[this.vowelsWildcard]]);
 
     // Consonants types  used for ruling out of syllables
-    plosives = new Set(["PC", "p", "t", "k", "b", "d", "g", "#"]);
-    fricatives = new Set(["FC", "f", "s", "j", "z", "#"]);
-    affricates = new Set(["AFC", "ch", "#"]);
-    nasals = new Set(["NC", "m", "n", "ñ", "#"]);
-    laterals = new Set(["LC", "l", "ll", "#"]);
-    approximants = new Set(["AC", "b", "x", "#"]);
-    vibrants = new Set(["BC", "r", "rr", "#"]);
+    plosives = new Set(["PC", "p", "t", "k", "b", "d", "g", this.consonantssWildcard]);
+    fricatives = new Set(["FC", "f", "s", "j", "z", this.consonantssWildcard]);
+    affricates = new Set(["AFC", "ch", this.consonantssWildcard]);
+    nasals = new Set(["NC", "m", "n", "ñ", this.consonantssWildcard]);
+    laterals = new Set(["LC", "l", "ll", this.consonantssWildcard]);
+    approximants = new Set(["AC", "b", "x", this.consonantssWildcard]);
+    vibrants = new Set(["BC", "r", "rr", this.consonantssWildcard]);
 
 
     // Used to rule in valid vocals joins
@@ -122,7 +127,6 @@ class coreMethods {
 
     //
     //
-
     hasValidEnding(str) {
 
         if (this.invalidSyllables2Endings.has(str.slice(-2)))
@@ -134,7 +138,8 @@ class coreMethods {
         return false;
     }
 
-
+    //
+    //
     dictionaryLoad(url) {
 
         const ok = r => (r.ok ? r : Promise.reject(new Error(`Failed: ${r.status} ${r.statusText}`)));
@@ -197,8 +202,8 @@ class coreMethods {
         const isConsonant = c => /^[b-df-hj-np-tv-z]$/i.test(c);
         const eq = (x, y) => (
             x === y ? true :
-                (x === '$' && isVowel(y)) || (y === '$' && isVowel(x)) ? true :
-                    (x === '#' && isConsonant(y)) || (y === '#' && isConsonant(x))
+                (x === this.vowelsWildcard && isVowel(y)) || (y === this.vowelsWildcard && isVowel(x)) ? true :
+                    (x === this.consonantssWildcard && isConsonant(y)) || (y === this.consonantssWildcard && isConsonant(x))
         );
 
         const m = a.length;
@@ -590,7 +595,7 @@ class magikEspellCheck extends Syllabifier {
         let V2F = this.isF2Valid(syllable),
             F3C = syllable.slice(0, 3),
             prevInsert = V2F ? syllable[0] : syllable[1],
-            makeTest = prev => this.replaceCharAt(syllable, 1, prev + "$"),
+            makeTest = prev => this.replaceCharAt(syllable, 1, prev + this.vowelsWildcard),
             exp = /[#|$]/;
 
         // If the first three characters are consonants and the test  syllable (CVC) is valid
@@ -600,27 +605,27 @@ class magikEspellCheck extends Syllabifier {
 
         // If AROUND current pos a CCV pattern is form and CC comb it's not valid 
         // we sustitute current char for VOWEL PATTERN (CVVC)
-        let test = syllable[0] + "$" + syllable[1] + syllable[2];
-        if (this.getEst(syllable) === "CCV" && !V2F && this.isValidSyllable(test) && syllable[1] !== "$")
+        let test = syllable[0] + this.vowelsWildcard + syllable[1] + syllable[2];
+        if (this.getEst(syllable) === "CCV" && !V2F && this.isValidSyllable(test) && syllable[1] !== this.vowelsWildcard)
             return test;
 
 
         // IF CC COMB IS INVALID and only 2 chars EXIST...
         if (this.getEst(syllable) == "CC" && !V2F)
-            return syllable[0] + "$" + syllable[1];
+            return syllable[0] + this.vowelsWildcard + syllable[1];
 
         // IF ENDING IS INVALID...
         if (!this.hasValidEnding(syllable) && this.getEst(syllable.slice(0, 2)))
-            return syllable + "$"
+            return syllable + this.vowelsWildcard
 
 
         // IF CC COMB IS INVALID AND 3 OR MORE CHAR EXIST
         if (!V2F)
-            return this.insertChar(syllable, 0, "$")
+            return this.insertChar(syllable, 0, this.vowelsWildcard)
 
         // IF CC COMB IS INVALID AND 3 OR MORE CHAR EXIST
         if (V2F)
-            return this.insertChar(syllable, 1, "$")
+            return this.insertChar(syllable, 1, this.vowelsWildcard)
 
         return syllable;
     }
@@ -702,7 +707,7 @@ class magikEspellCheck extends Syllabifier {
         }
 
         // STARTS IN C
-        if (this.getEst(start[0][0]) === "V" && this.isValidSyllable("#" + start[0][0])) {
+        if (this.getEst(start[0][0]) === "V" && this.isValidSyllable(this.consonantssWildcard + start[0][0])) {
             consonants.forEach((l) => { start.push(l + start[0][0]) });
         }
 
@@ -714,8 +719,8 @@ class magikEspellCheck extends Syllabifier {
         // WORD'S START VRS IF ANY
         if (/[$|#]/.test(F2C)) {
 
-            F2C.indexOf("$") >= 0 ? vowels.forEach((l) => { start.push(F2C.replace("$", l)) })
-                : consonants.forEach((l) => { start.push(F2C.replace("#", l)) });
+            F2C.indexOf(this.vowelsWildcard) >= 0 ? vowels.forEach((l) => { start.push(F2C.replace(this.vowelsWildcard, l)) })
+                : consonants.forEach((l) => { start.push(F2C.replace(this.consonantssWildcard, l)) });
         }
 
         // PATTERN END
