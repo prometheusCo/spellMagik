@@ -33,7 +33,7 @@
 class coreMethods {
 
 
-    dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/dictionaryC.txt";
+    dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionaryC.txt";
 
     dictData; dictMapped = new Map();
 
