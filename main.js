@@ -888,7 +888,7 @@ class magikEspellCheck extends Syllabifier {
             word = word.toLowerCase();
 
             if (this.check(word))
-                return true;
+                callBack(true);
 
             let mutations = this.generateMutations(word)
             let altMutations = this.generateMutations(this.cutUntilTrue(word)[1])
