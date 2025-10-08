@@ -104,6 +104,8 @@ class coreMethods {
 
     noiseCache = new Set([]);
 
+    ready = false;
+
     //
     // Simple one-liner helpers
     //
@@ -120,6 +122,7 @@ class coreMethods {
 
     //
     //
+
     hasValidEnding(str) {
 
         if (this.invalidSyllables2Endings.has(str.slice(-2)))
@@ -504,9 +507,10 @@ class magikEspellCheck extends Syllabifier {
 
         })
 
-        if (this.warmStart) {
-            this.correct("pkdmos", true); this.warmStart = false;
-        }
+        this.ready = true;
+        this.dictData = null;
+        this.warmStart ? this.correct("pkdmos") : null;
+
         console.log("Dictionary fully loaded");
     }
 
@@ -769,22 +773,35 @@ class magikEspellCheck extends Syllabifier {
 
     //
     //
-    correct(word, start = performance.now()) {
+    correct(word, callBack = false) {
 
-        this.noiseCache = new Set([]);
-        word = word.toLowerCase();
+        const start = performance.now();
+        let rInt;
+        const waitTillReady = () => { rInt = setInterval(() => { this.ready ? clearInterval(rInt) & run() : null }, 500) }
 
-        if (this.check(word))
-            return true;
+        const run = () => {
 
-        let mutations = this.generateMutations(word)
-        let altMutations = this.generateMutations(this.cutUntilTrue(word)[1])
-        let sugestions = this.returnSuggestions([...mutations, ...altMutations], word);
+            this.noiseCache = new Set([]);
+            word = word.toLowerCase();
 
-        start && !this.warmStart ? this.printTime(start, " EXEC TIME", 10) : null;
+            if (this.check(word))
+                return true;
 
-        if (!this.warmStart)
-            return sugestions;
+            let mutations = this.generateMutations(word)
+            let altMutations = this.generateMutations(this.cutUntilTrue(word)[1])
+            let sugestions = this.returnSuggestions([...mutations, ...altMutations], word);
+
+            start && !this.warmStart ? this.printTime(start, " EXEC TIME", 10) : null;
+
+            if (!this.warmStart)
+                callBack(sugestions);
+
+            this.warmStart ? this.warmStart = false : null;
+
+        }
+
+        (this.ready) ? run() : waitTillReady();
+
     }
 
 }
