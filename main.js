@@ -761,7 +761,7 @@ class magikEspellCheck extends Syllabifier {
 
                 if (noiseCache.has(w) || w.length !== ln || !reg.test(w)) return;
 
-                let score = spell.diffScoreStrings(ogWord, w);
+                let score = this.diffScoreStrings(ogWord, w);
                 if (score < this.stringDiff) return;
 
                 noiseCache.add(w);
@@ -793,7 +793,7 @@ class magikEspellCheck extends Syllabifier {
 
             start && !this.warmStart ? this.printTime(start, " EXEC TIME", 10) : null;
 
-            if (!this.warmStart)
+            if (!this.warmStart && !!callBack)
                 callBack(sugestions);
 
             this.warmStart ? this.warmStart = false : null;
