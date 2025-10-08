@@ -36,27 +36,35 @@ class coreMethods {
 
     //
     //  CONF ZONE
+    //  Remote dictionary (comma-separated tokens; optionally gzip-compressed or base64)
     dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionaryC.txt";
 
+    //  Max refinement passes when spliting in syllables
     epochs = 3;
 
+    //  Minimum similarity to accept suggestion (0–1). Higher => stricter
     stringDiff = 0.7;
 
+    //  Cap on suggestions returned
     maxNumSuggestions = 10;
 
+    //  Warm-up run to avoid first-call latency
     warmStart = true;
 
+    //  Wildcard tokens used INSIDE candidate patterns:
+    //  vowelsWildcard => matches any vowel; consonantssWildcard => any consonant
     vowelsWildcard = "§";
     consonantssWildcard = "~";
 
     //
-    // Vowels used to better clasification
+    // Vowels used for syllabification and others checks (Spanish-centric)
     weakVowels = ['i', 'u'];
     strongVowels = ['a', 'e', 'o']
 
+    // Set used by classification helpers
     vowels = new Set([...this.weakVowels, ...this.strongVowels, ...[this.vowelsWildcard]]);
 
-    // Consonants types  used for ruling out of syllables
+    // Consonant classes (sound types) used to validate onsets/clusters
     plosives = new Set(["PC", "p", "t", "k", "b", "d", "g", this.consonantssWildcard]);
     fricatives = new Set(["FC", "f", "s", "j", "z", this.consonantssWildcard]);
     affricates = new Set(["AFC", "ch", this.consonantssWildcard]);
@@ -66,7 +74,7 @@ class coreMethods {
     vibrants = new Set(["BC", "r", "rr", this.consonantssWildcard]);
 
 
-    // Used to rule in valid vocals joins
+    // correct vowel junctions (diphthongs/triphthongs) for Spanish
     diphthongsAndtriphthongs = [
         "ia", "ie", "io", 'uei',
         "ua", "ue", "uo", "ió",
@@ -78,7 +86,8 @@ class coreMethods {
     ];
 
 
-    // Valid two-consonant ONSET clusters by consonant (sound) TYPE
+    // correct two-consonant onset clusters by consonant TYPE (encoded)
+    // Example: "PCLC" means a plosive followed by a lateral (pl, bl, cl, gl)
     valid2CSounds = new Set([
 
         "PCLC", // pl, bl, cl, gl
@@ -88,45 +97,55 @@ class coreMethods {
     ]);
 
     //
+    // Digraphs that function as single sounds
     twoLettersSounds = new Set(["rr", "ll", "ch"]);
 
-    // Used to determine if a syllable is misspelled by looking at it's ending letters
+    // Heuristics to reject clearly illegal syllable endings
     invalidSyllablesEndings = new Set(["k", "g", "c", "x", "f", "d", "v", "gn"]);
 
-    // Used to determine if a syllable is misspelled by looking at it's ending letters
+    // Secondary endings blacklist (more specific)
     invalidSyllables2Endings = new Set(["vl"]);
 
-    // Letter that form an exception to list above
+    // Exceptions that keep some endings correct despite blacklist above
     invalidSyllablesEndingsExceptions = new Set(["ac", "oc", "ec", "ic", "ag", "ex", "ed"]);
 
-    // Invalid word's starts that makes a syllable be considered misspelled
+    // Illegal word starts that instantly mark a syllable split as invalid
     invalidStarts = new Set(["ki", "qi", "vr", "ko", "st", "rv"]);
 
-    // Used to know if we must go a litle further on the heuristic syllable generation
-    // This set won't invalidate a syllable but it will force the program to look for another
-    // valid mutation in case this result in an invalid word creation
+    // Suspicious starts: not an outright error, but trigger extra mutation attempts
     suspiciousStarts = new Set(["w", "k"]);
 
+    // Cache to avoid duplicate candidates during suggestion expansion
     noiseCache = new Set([]);
 
+    // Flag set when dictionary is ready
     ready = false;
 
     //
     // Simple one-liner helpers
     //
 
+    // Normalize: lowercase + strip diacritics (unicode-safe)
     clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+    // Absolute value (micro-helper)
     pos = n => n < 0 ? n * (-1) : n;
+    // Guard against nullish/empty
     isValid = val => val !== undefined && val !== "" && val !== null && val !== "undefined";
+    // Replace char at index
     replaceCharAt = (str, pos, char) => str.slice(0, pos) + char + str.slice(pos + 1);
+    // Split array in two parts at index
     splitArrayAt = (arr, pos) => [arr.slice(0, pos), arr.slice(pos)];
+    // Insert char AFTER position x
     insertChar = (y, x, c) => y.slice(0, x + 1) + c + y.slice(x + 1);
+    // Check if two-letter token is a Spanish digraph
     isTwoLettersSounds = ll => this.twoLettersSounds.has(ll);
+    // Detect wildcard tokens in a string
     hasSymbols = str => new RegExp(/[§|~]/).test(str);
+    // Count items containing substring
     count = (arr, str) => [...arr].filter((a) => a.indexOf(str) >= 0).length
 
     //
-    //
+    // Validate syllable ending using primary/secondary blacklists + exceptions
     hasValidEnding(str) {
 
         if (this.invalidSyllables2Endings.has(str.slice(-2)))
@@ -139,7 +158,8 @@ class coreMethods {
     }
 
     //
-    //
+    // Load dictionary into memory, supporting plain text, base64, or gzip (browser-native DecompressionStream)
+    // Persists raw string in localStorage to avoid refetching across sessions.
     dictionaryLoad(url) {
 
         const loadedData = localStorage.getItem("magikEspellCheckDict");
@@ -148,13 +168,16 @@ class coreMethods {
         const ok = r => (r.ok ? r : Promise.reject(new Error(`Failed: ${r.status} ${r.statusText}`)));
         const set = t => (this.dictData = t, t && this.prepareDict());
 
+        // Heuristic base64 detector (length%4 + charset)
         const isB64 = s => /^[A-Za-z0-9+/=\s]+$/.test(s) && (s.replace(/\s+/g, "").length % 4 === 0);
+        // decode base64 into bytes
         const fromB64 = s => {
             const bin = atob(s.replace(/\s+/g, ""));
             const out = new Uint8Array(bin.length);
             for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
             return out;
         };
+        // treat input as raw binary string
         const fromBin = s => {
             const out = new Uint8Array(s.length);
             for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 255;
@@ -181,7 +204,9 @@ class coreMethods {
 
 
     //
-    //Litle  helper to measure code exec time
+    // Litle  helper to measure code exec time
+    // Use around hot paths to observe wall time in seconds
+    // declare end = performance.now() at begining of flow and printTime at end
     printTime(start, msg = "miScript:", fixed = 2) {
 
         const end = performance.now();
@@ -190,7 +215,10 @@ class coreMethods {
     }
 
     //
-    // Given a word, return its V/C structure (e.g., VOWEL + CONSONANT + VOWEL…)
+    // Given a word, return its V/C structure (e.g., "VCVCC").
+    // returnType:
+    //   - "string" => "VCVC"
+    //   - "array"  => ["V","C","V","C"]
     getEst(word, returnType = "string") {
 
         if (!this.isValid(word)) return "";
@@ -204,6 +232,8 @@ class coreMethods {
     //
     //
 
+    // Weighted Levenshtein-like similarity with vowel/consonant wildcards.
+    // Returns a score in ~[0.1, 0.99]; higher means more similar.
     diffScoreStrings = (a, b, weights = { ins: 0.7, del: 1.3, sub: 1.0 }) => {
 
         const vowels = 'aeiouAEIOU';
@@ -250,9 +280,10 @@ class coreMethods {
 
 
     //
-    // Try to find a match for a `word` inside an `array`. If `loose` is false → only exact matches are found
-    // if `loose` is true → near matches are allow . Returns the first matching element, or `false`.
-    // 
+    // Try to find a match for a `word` inside an `array`.
+    // loose=false => exact match
+    // loose=true  => accept near-embedded matches when length diff <= 1
+    // Returns matched token or false.
     reverseSearch(word, array, loose = false) {
 
         array = [...array];
@@ -265,7 +296,8 @@ class coreMethods {
         return r;
     }
     //
-    // Move chars backward/forward between array positions
+    // Move single character across syllable boundaries, merging into neighbor.
+    // direction: "right" => transfer last char to the next slot; "left" => transfer first char to prev slot.
     moveAround(arr, pos, char, direction) {
 
         const to = direction === "right" ? pos + 1 : pos - 1;
@@ -292,6 +324,8 @@ class coreMethodsExt extends coreMethods {
     }
     //
     // Given a word, return its V/C structure BUT annotating consonant type (PC, FC, etc.)
+    // For consonants: maps to the first element of each class Set (e.g., "PC","FC"...).
+    // Useful to validate correct onsets like pl, br, fr...
     getEstExt(word, returnType = "array") {
 
         if (!this.isValid(word)) return "NN"
@@ -320,7 +354,8 @@ class coreMethodsExt extends coreMethods {
         return r;
     }
     //
-    // Validate first two letters (onset) against allowed clusters and exceptions
+    // Validate first two letters (onset) against allowed clusters and exceptions.
+    // Rejects early for disallowed starts (e.g., "st", "rv") and special-case digraphs.
     isF2Valid(word) {
 
         let f2 = word.slice(0, 2)
@@ -332,7 +367,7 @@ class coreMethodsExt extends coreMethods {
         if (inValidStart)
             return false;
 
-        // Early return for easy cases
+        // Early return for easy cases: CV or VC is always ok for the first two slots
         if (estS === "CV" || estS == "VC")
             return true;
 
@@ -344,13 +379,13 @@ class coreMethodsExt extends coreMethods {
         if (((f2 === "rr" || f2 === "ll" || f2 == "ch" || f2 === "ps") && word.length > 2) || f3 === "ciu" || f3 === "cie")
             return true;
 
-        // Otherwise we  test the current sound patter to those allowed in spanish (for the firs 2C)
+        // Otherwise, test cluster type against the correct 2C onset patterns
         return this.valid2CSounds.has(est);
     }
 
     //
-    // Detects whether a syllable is misspelled or not based on first 2 consonants,
-    // structure, last char type or general structure of the syllable
+    // Determine whether a syllable is correct.
+    // Uses structure (V/C), diphthong/triphthong membership, onset legality, and ending checks.
     isValidSyllable(syllable) {
 
         const syllableEst = this.getEst(syllable);
@@ -395,6 +430,7 @@ class Syllabifier extends coreMethodsExt {
 
     //
     // Heuristic rules to help the main loop split into syllables more accurately
+    // Operates on the last two syllables only (local repair) to avoid over-merging.
     //
     rulesApply = (syllables) => {
 
@@ -414,11 +450,12 @@ class Syllabifier extends coreMethodsExt {
         // Sanity check: limit to last 3 chars
         if (conjuntion.length > 3) conjuntion = conjuntion.slice(-3);
 
-        // If last syllable starts with invalid 2-consonant onset, fix it
+        // If last syllable starts with invalid 2-consonant onset, move one char left
         // Syllables with only 2 chars won't fit this rule
         if (lasSEst.slice(0, 2) === "CC" && !this.isF2Valid(lastS) && lasSEst.length > 2)
             this.moveAround(syllables, syllables.length - 1, firstLastS, "left");
 
+        // If the "syllable" is a digraph (rr,ll,ch), merge into the previous one
         if (this.isTwoLettersSounds(lastS)) {
             syllables[syllables.length - 2] = syllables[syllables.length - 2] + lastS;
             syllables.pop();
@@ -426,7 +463,7 @@ class Syllabifier extends coreMethodsExt {
         }
 
         // No syllable can be a single consonant.
-        // If last letter of previous syllable + first of current syllable form a diphthong, join them.
+        // If last letter of prev + first of current forms a diphthong, join them (fix over-split).
         if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongsAndtriphthongs, true)))
             this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
@@ -437,6 +474,9 @@ class Syllabifier extends coreMethodsExt {
 
     //  
     // Heuristic syllable splitter
+    // Streaming approach:
+    //   - Buffer consonants until a vowel arrives, then flush (buffer + vowel) as syllable.
+    //   - After each push, apply local rules to fix boundary mistakes.
     //
 
     splitInSyllables(word) {
@@ -495,6 +535,11 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
+    // Prepare dictionary:
+    //   - Split CSV-like content
+    //   - Strip quotes at boundaries
+    //   - Build a 2-level index Map: first-letter -> first-two-letters -> Set(words)
+    //   - Persist raw string for future sessions and drop large arrays from RAM
     //
     prepareDict() {
 
@@ -530,6 +575,8 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
+    // Get Set of candidates sharing same first two chars, if legal.
+    // Returns Set<string> or false if missing/illegal prefix.
     //
     getSet(word) {
 
@@ -548,6 +595,7 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
+    // Group words by first two letters and length (used for diagnostics or debugging)
     //
     groupWords(arr) {
 
@@ -567,6 +615,9 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
+    // Check:
+    //   - onlyCheckSyllables=true: validate syllable legality (array or string)
+    //   - onlyCheckSyllables=false: validate full word exact presence in dictionary bucket
     //
     check(word, onlyCheckSyllables = false) {
 
@@ -598,6 +649,9 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
+    // Advanced syllable repair rules.
+    // Injects wildcard vowels or repositions characters to transform illegal CC/CCC patterns
+    // into correct CVC/CVVC forms, and fixes illegal endings by appending a vowel wildcard.
     //
     advancedRulesAplly(_syllable) {
 
@@ -641,6 +695,8 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
+    // Cut a string into [left, right] where `right` is the first correct syllable suffix if possible.
+    // If input is already an array of syllables and length>1, return as-is.
     //
     cutUntilTrue(word) {
 
@@ -664,6 +720,10 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
+    // Top-level syllabifier for correction:
+    //   1) Try a robust split (fallback to cutUntilTrue if needed)
+    //   2) Iterate (epochs) applying repairs
+    //   3) Resplit with baseline syllabifier to avoid drift
     //
     splitInSyllables(_syllables) {
 
@@ -697,6 +757,11 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
+    // Generate length-/pattern-constrained regexes to probe dictionary buckets.
+    // Uses:
+    //   - onset alternatives (swap letters, fill wildcard with concrete vowels/consonants)
+    //   - middle-length ±1 tolerance
+    //   - ending wildcard alignment
     //
     generateMutations(word) {
 
@@ -726,18 +791,18 @@ class magikEspellCheck extends Syllabifier {
             start.push(F2C[1] + F2C[0]);
         }
 
-        // WORD'S START VRS IF ANY
+        // WORD'S START VRS IF ANY (expand wildcard to concrete vowels/consonants)
         if (/[§|~]/.test(F2C)) {
 
             F2C.indexOf(this.vowelsWildcard) >= 0 ? vowels.forEach((l) => { start.push(F2C.replace(this.vowelsWildcard, l)) })
                 : consonants.forEach((l) => { start.push(F2C.replace(this.consonantssWildcard, l)) });
         }
 
-        // PATTERN END
+        // PATTERN END: if end contains wildcard, reduce to its suffix beginning at wildcard
         if (end.search(/[§|~]/) >= 0)
             end = end.slice(end.search(/[§|~]/))
 
-        // PATTER MIDDLE
+        // PATTER MIDDLE: remove first two chars and terminal suffix to isolate the middle-run length
         middle = middle.slice(2, -(end.length))
 
         // GENERATING FINAL MUTATIONS TO TEST AGAINST CLUSTER
@@ -746,6 +811,8 @@ class magikEspellCheck extends Syllabifier {
             let n = middle.length;
             for (let index = -2; index < 2; index++) {
 
+                // NOTE: [a-z] here is ASCII-limited by design, because dictionary tokens are normalized ASCII.
+                // If dictionary becomes fully Unicode-normalized, this can be widened accordingly.
                 let expReg = `${st}[a-z]{${(n + index)}}${end}`;
                 if (/[§|~]/.test(st))
                     continue;
@@ -757,6 +824,12 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
+    // Given mutation regexes and the original word, scan matching bucket and score candidates.
+    // Filters:
+    //   - exact length for each regex (precomputed `ln`)
+    //   - regex match
+    //   - similarity >= stringDiff
+    // Deduplicates with noiseCache, sorts by score desc, trims to maxNumSuggestions.
     //
     returnSuggestions(patterns, ogWord) {
 
@@ -787,6 +860,15 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
+    // correct(word, callBack?)
+    // Orchestrates the flow:
+    //   1) Wait until dictionary is ready (warm cache on first call if warmStart)
+    //   2) If the word is valid (exact match in its bucket), return true (synchronous)
+    //   3) Else generate patterns from syllable mutations and from the right-side cutUntilTrue()
+    //   4) Compute scored suggestions
+    //   5) If not warm-starting and callback exists, invoke callback(suggestions)
+    // Note:
+    //   - Uses a setInterval-based "waitTillReady" to keep a callback-style API (no Promises).
     //
     correct(word, callBack = false) {
 
