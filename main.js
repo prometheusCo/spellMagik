@@ -106,6 +106,8 @@ class coreMethods {
 
     //
     // Simple one-liner helpers
+    //
+
     clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
     pos = n => n < 0 ? n * (-1) : n;
     isValid = val => val !== undefined && val !== "" && val !== null && val !== "undefined";
@@ -115,9 +117,6 @@ class coreMethods {
     isTwoLettersSounds = ll => this.twoLettersSounds.has(ll);
     hasSymbols = str => new RegExp(/[$|#]/).test(str);
     count = (arr, str) => [...arr].filter((a) => a.indexOf(str) >= 0).length
-
-    //
-    //
 
     //
     //
