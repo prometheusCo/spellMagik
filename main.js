@@ -790,8 +790,14 @@ class magikEspellCheck extends Syllabifier {
     //
     correct(word, callBack = false) {
 
+        // comment this if you dont want to mesure exec time
         const start = performance.now();
-        let rInt;
+        let rInt; // use to clear callback int
+        //
+        // This helper sustitutes a promise paradigm for a callback return type paradigm, wich I preffer.
+        // You call correct method with the callback to exec return as 2nd argument
+        //  If  you don't like it you can swith to a promise paradigm type
+        //
         const waitTillReady = () => { rInt = setInterval(() => { this.ready ? clearInterval(rInt) & run() : null }, 500) }
 
         const run = () => {
@@ -806,7 +812,7 @@ class magikEspellCheck extends Syllabifier {
             let altMutations = this.generateMutations(this.cutUntilTrue(word)[1])
             let sugestions = this.returnSuggestions([...mutations, ...altMutations], word);
 
-            start && !this.warmStart ? this.printTime(start, " EXEC TIME", 10) : null;
+            this.isValid(start) && !this.warmStart ? this.printTime(start, " EXEC TIME", 10) : null;
 
             if (!this.warmStart && !!callBack)
                 callBack(sugestions);
