@@ -103,6 +103,4 @@ Cannot be sold as a standalone paid product.
 **© 2025 José Alejandro Palomo González**
 Designed for high accuracy, low latency, and full browser compatibility.
 
----
 
-Would you like me to make this version ready for direct GitHub rendering (Markdown-optimized with badges and section anchors)?
