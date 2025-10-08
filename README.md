@@ -1,6 +1,4 @@
-Sure — here’s a **short, professional, human-readable README** for GitHub, tailored exactly to your code’s behavior (including that `correct()` also triggers the callback when the word is already correct).
 
----
 
 # magikEspellCheck
 
