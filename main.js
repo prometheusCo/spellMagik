@@ -45,6 +45,9 @@ class coreMethods {
     //  Minimum similarity to accept suggestion (0–1). Higher => stricter
     stringDiff = 0.7;
 
+    /* String diff tolerance for especial cases ( swaped initial letters for exam)
+    =====> */  diffTolerance = 0.10;
+
     //  Cap on suggestions returned
     maxNumSuggestions = 10;
 
@@ -418,13 +421,12 @@ class Syllabifier extends coreMethodsExt {
     //
     rulesApply = (syllables) => {
 
-
+        const ogSyllables = syllables;
         const lastS = syllables[syllables.length - 1];
         const lastLastS = syllables[syllables.length - 2] ?? false;
 
         if (!lastLastS) return syllables;
 
-        const lastLetterLastlastS = lastLastS[lastLastS.length - 1];
         const lasSEst = this.getEst(lastS);
         const firstLastS = lastS.slice(0, 1);
         const firstLetLastEst = this.getEst(firstLastS)
@@ -451,10 +453,48 @@ class Syllabifier extends coreMethodsExt {
         if (lasSEst === "C" || (firstLetLastEst !== "C" && this.isValidVowelCluster(conjuntion)))
             this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
+        //If syllable is still unmutated and is invalid and it's made of 2 CC            
+        if (syllables === ogSyllables && !this.isValidSyllable(syllables.at(-1)) && this.getEst(lastS) === "CC") {
+
+            // we test removing last C, and adding a V at the begining if syllable doesn't end in s
+            let test = this.vowelsWildcard + lastS.slice(0, 1);
+            if (lastS.at(-1) !== "s" && this.isValidSyllable(test))
+                syllables[syllables.length - 1] = test;
+        }
+
+        // If syllable is still unmutated  we look for an ending valid syllable from rigth to left
+        // oposed to the normal flow => from left to rigth
+        if (syllables === ogSyllables)
+            syllables = this.cutUntilTrue(syllables);
+
         // Final cleanup
         return typeof syllables === "object" ? syllables.filter((s) => s !== "") : syllables;
     }
 
+    //
+    // Cut a string into [left, right] where `right` is the first correct syllable suffix if possible.
+    // If input is already an array of syllables and length>1, return as-is.
+    //
+    cutUntilTrue(word) {
+
+        if (typeof word == "object") {
+
+            if (word.length > 1) return word;
+            word = word[0];
+        }
+
+        for (let index = 0; index < word.length; index++) {
+
+            let test = word.slice(index);
+
+            if (this.isValidSyllable(test))
+                return [word.slice(0, index), test]
+        }
+
+        let cut = Math.round(word.length / 2)
+        return [word.slice(0, cut), word.slice(cut)];
+
+    }
 
     //  
     // Heuristic syllable splitter
@@ -679,31 +719,6 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
-    // Cut a string into [left, right] where `right` is the first correct syllable suffix if possible.
-    // If input is already an array of syllables and length>1, return as-is.
-    //
-    cutUntilTrue(word) {
-
-        if (typeof word == "object") {
-
-            if (word.length > 1) return word;
-            word = word[0];
-        }
-
-        for (let index = 0; index < word.length; index++) {
-
-            let test = word.slice(index);
-
-            if (this.isValidSyllable(test))
-                return [word.slice(0, index), test]
-        }
-
-        let cut = Math.round(word.length / 2)
-        return [word.slice(0, cut), word.slice(cut)];
-
-    }
-
-    //
     // Top-level syllabifier for correction:
     //   1) Try a robust split (fallback to cutUntilTrue if needed)
     //   2) Iterate (epochs) applying repairs
@@ -711,7 +726,7 @@ class magikEspellCheck extends Syllabifier {
     //
     splitInSyllables(_syllables) {
 
-        let syllables = this.cutUntilTrue(super.splitInSyllables(_syllables));
+        let syllables = super.splitInSyllables(_syllables);
         let ogSyllabifier = new Syllabifier();
         let epochs = 0, hasValidSyllables = false;
 
@@ -755,25 +770,26 @@ class magikEspellCheck extends Syllabifier {
 
         let start = [F2C], middle = candidate.join(""), end = candidate.at(-1).slice(-1);
         const vowels = this.vowels;
+        let startLetter = start[0][0];
         const consonants = [
             'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm',
             'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z'
         ]
 
         // STARTS IN V
-        if (this.getEst(start[0][0]) === "C") {
-            vowels.forEach((l) => { start.push(l + start[0][0]) });
+        if (this.getEst(startLetter) === "C") {
+            vowels.forEach((l) => { start.push(l + startLetter) });
+            vowels.forEach((l) => { start.push(l + word.slice(1, 2)) });
         }
 
         // STARTS IN C
-        if (this.getEst(start[0][0]) === "V" && this.isValidSyllable(this.consonantssWildcard + start[0][0])) {
-            consonants.forEach((l) => { start.push(l + start[0][0]) });
-        }
+        if (this.getEst(startLetter) === "V" && this.isValidSyllable(this.consonantssWildcard + startLetter))
+            consonants.forEach((l) => { start.push(l + startLetter) });
+
 
         // STARTS  WITH SWAPPED LETTERS
-        if (this.isValidSyllable(F2C[1] + F2C[0])) {
+        if (this.isValidSyllable(F2C[1] + F2C[0]))
             start.push(F2C[1] + F2C[0]);
-        }
 
         // WORD'S START VRS IF ANY (expand wildcard to concrete vowels/consonants)
         if (/[§|~]/.test(F2C)) {
@@ -817,6 +833,7 @@ class magikEspellCheck extends Syllabifier {
     //
     returnSuggestions(patterns, ogWord) {
 
+        console.log(patterns);
         let noiseCache = this.noiseCache;
         let lastOgL = ogWord[ogWord.length - 1];
 
@@ -848,9 +865,8 @@ class magikEspellCheck extends Syllabifier {
     // Orchestrates the flow:
     //   1) Wait until dictionary is ready (warm cache on first call if warmStart)
     //   2) If the word is valid (exact match in its bucket), return true (synchronous)
-    //   3) Else generate patterns from syllable mutations and from the right-side cutUntilTrue()
-    //   4) Compute scored suggestions
-    //   5) If not warm-starting and callback exists, invoke callback(suggestions)
+    //   3) Compute scored suggestions
+    //   4) If not warm-starting and callback exists, invoke callback(suggestions)
     // Note:
     //   - Uses a setInterval-based "waitTillReady" to keep a callback-style API (no Promises).
     //
@@ -872,16 +888,15 @@ class magikEspellCheck extends Syllabifier {
             word = word.toLowerCase();
 
             if (this.check(word))
-                callBack(true);
+                return callBack(true);
 
             let mutations = this.generateMutations(word)
-            let altMutations = this.generateMutations(this.cutUntilTrue(word)[1])
-            let sugestions = this.returnSuggestions([...mutations, ...altMutations], word);
 
+            let sugestions = this.returnSuggestions([...mutations], word);
             this.isValid(start) && !this.warmStart ? this.printTime(start, " EXEC TIME", 10) : null;
 
             if (!this.warmStart && !!callBack)
-                callBack(sugestions);
+                return callBack(sugestions);
 
             this.warmStart ? this.warmStart = false : null;
 
