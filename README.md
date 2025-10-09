@@ -71,6 +71,8 @@ spell.correct(word, callback)
   * returns `true`, **and**
   * calls the callback with the result.
 
+* If it's not valid
+  
   * generates candidates,
   * scores them, and
   * calls the callback with the top suggestions.
@@ -82,7 +84,7 @@ No Promises — pure callback flow.
 ## ⚡ Performance
 
 * 2-level dictionary index (`a → ab → Set(words)`) for fast lookups.
-* Typed arrays for edit-distance computation.
+* Typed arrays for fast edit-distance computation.
 * First call “warm-start” compiles hot paths for low latency later.
 
 ---
