@@ -69,7 +69,7 @@ spell.correct(word, callback)
 * If the word is **valid**, it:
 
   * returns `true`, **and**
-  * If not, it:
+  * calls the callback with the result.
 
   * generates candidates,
   * scores them, and
