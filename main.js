@@ -46,7 +46,7 @@ class coreMethods {
     stringDiff = 0.7;
 
     /* String diff tolerance for especial cases ( swaped initial letters for exam)
-    =====> */  diffTolerance = 0.10;
+    =====> */  diffTolerance = 0.15;
 
     //  Cap on suggestions returned
     maxNumSuggestions = 10;
@@ -109,6 +109,9 @@ class coreMethods {
     // Cache to avoid duplicate candidates during suggestion expansion
     noiseCache = new Set([]);
 
+    // Invalid syllabes false positives
+    invalidSyllablesFalseP = new Set(["au"])
+
     // Flag set when dictionary is ready
     ready = false;
 
@@ -134,6 +137,9 @@ class coreMethods {
     hasSymbols = str => new RegExp(/[§|~]/).test(str);
     // Count items containing substring
     count = (arr, str) => [...arr].filter((a) => a.indexOf(str) >= 0).length
+    // Is an string an inverted version of another???
+    isInverted = (a, b) => a.split("").reverse().join("") == b
+
 
     //
     // Validate syllable ending using primary/secondary blacklists + exceptions
@@ -388,6 +394,9 @@ class coreMethodsExt extends coreMethods {
         if (syllableEst === "V")
             return true;
 
+        if (this.invalidSyllablesFalseP.has(syllable))
+            return true;
+
         if (hasVVV && !isValidf3c)
             return false;
 
@@ -619,7 +628,7 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
-    // Group words by first two letters and length (used for diagnostics or debugging)
+    // Group words by first two letters and length (used for faster pattern search)
     //
     groupWords(arr) {
 
@@ -833,7 +842,8 @@ class magikEspellCheck extends Syllabifier {
     //
     returnSuggestions(patterns, ogWord) {
 
-        console.log(patterns);
+        console.log(patterns)
+        let invf2l = ogWord[1] + ogWord[0];
         let noiseCache = this.noiseCache;
         let lastOgL = ogWord[ogWord.length - 1];
 
@@ -851,6 +861,10 @@ class magikEspellCheck extends Syllabifier {
                 if (noiseCache.has(w) || w.length !== ln || !reg.test(w)) return;
 
                 let score = this.diffScoreStrings(ogWord, w);
+
+                // If the first two letters are swapped, reduce the difference level
+                invf2l == w.slice(0, 2) ? score = score + this.diffTolerance : null;
+
                 if (score < this.stringDiff) return;
 
                 noiseCache.add(w);
