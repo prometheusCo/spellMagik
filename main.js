@@ -36,7 +36,7 @@ class coreMethods {
 
     //
     //  CONF ZONE
-    //  Remote dictionary (comma-separated tokens; optionally gzip-compressed or base64)
+    //  Remote dictionary (comma-separated tokens; optionally gzip-compressed)
     dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionaryC.txt";
 
     //  Max refinement passes when spliting in syllables
@@ -72,18 +72,6 @@ class coreMethods {
     laterals = new Set(["LC", "l", "ll", this.consonantssWildcard]);
     approximants = new Set(["AC", "b", "x", this.consonantssWildcard]);
     vibrants = new Set(["BC", "r", "rr", this.consonantssWildcard]);
-
-
-    // correct vowel junctions (diphthongs/triphthongs) for Spanish
-    diphthongsAndtriphthongs = [
-        "ia", "ie", "io", 'uei',
-        "ua", "ue", "uo", "ió",
-        "ai", "ei", "oi",
-        "au", "eu", "ou",
-        "iu", "ui", "ai",
-        "üi", "üe", "üa",
-        "üé", "uí", "üí"
-    ];
 
 
     // correct two-consonant onset clusters by consonant TYPE (encoded)
@@ -202,6 +190,17 @@ class coreMethods {
             .then(set);
     }
 
+    //
+    //
+    isValidVowelCluster(str) {
+
+        if (/[gqc]üi|[gqc]uí|üí/giu.test(str))
+            return true;
+
+        const regex = /§?(?:[iuü][aeoáéó]|[aeoáéó][iuü]|[iuü]{2}|[iuü][aeoáéó][iuü]|[aeoáéó]y\b|[iuü]y\b|[iuü][aeoáéó]y\b)§?/iu;
+        return regex.test(str);
+
+    }
 
     //
     // Litle  helper to measure code exec time
@@ -279,22 +278,6 @@ class coreMethods {
     };
 
 
-    //
-    // Try to find a match for a `word` inside an `array`.
-    // loose=false => exact match
-    // loose=true  => accept near-embedded matches when length diff <= 1
-    // Returns matched token or false.
-    reverseSearch(word, array, loose = false) {
-
-        array = [...array];
-        let r = false;
-        array.some((a) => {
-            if ((word.indexOf(a) >= 0 && loose && this.pos(a.length - word.length) <= 1) || (word === a)) {
-                r = a; return true;
-            }
-        })
-        return r;
-    }
     //
     // Move single character across syllable boundaries, merging into neighbor.
     // direction: "right" => transfer last char to the next slot; "left" => transfer first char to prev slot.
@@ -388,9 +371,13 @@ class coreMethodsExt extends coreMethods {
     // Uses structure (V/C), diphthong/triphthong membership, onset legality, and ending checks.
     isValidSyllable(syllable) {
 
-        const syllableEst = this.getEst(syllable);
-        const syllableEnding = syllable.slice(syllable.length - 1);
         const f2l = syllable.slice(0, 2);
+        const f3l = syllable.slice(0, 3);
+        const syllableEst = this.getEst(syllable);
+        const syllableEstF3 = syllableEst.slice(0, 3);
+        const isValidf3c = this.isValidVowelCluster(f3l);
+
+        const hasVVV = /VVV/.test(syllable);
 
         if (syllableEst === "C")
             return false;
@@ -398,17 +385,14 @@ class coreMethodsExt extends coreMethods {
         if (syllableEst === "V")
             return true;
 
-        if (this.getEst(syllable.slice(0, 3)) === "VVV" && !this.reverseSearch(syllable, this.diphthongsAndtriphthongs))
+        if (hasVVV && !isValidf3c)
             return false;
 
-        if (syllableEst.slice(0, 3) === "CCC")
+        if (syllableEstF3 === "CCC")
             return false;
 
         let hasInvalidEnding = !this.hasValidEnding(syllable)
         let is2fv = this.isF2Valid(syllable);
-
-        if (!!this.reverseSearch(syllable, this.diphthongsAndtriphthongs, true) && (syllableEst === "CVV" || syllableEst === "VVC"))
-            return true;
 
         if (!is2fv && !(syllableEst === "CV" || syllableEst === "VC" || syllableEst === "VCV" || syllableEst === "CVCV" ||
             syllableEst === "CVC") || (hasInvalidEnding))
@@ -464,7 +448,7 @@ class Syllabifier extends coreMethodsExt {
 
         // No syllable can be a single consonant.
         // If last letter of prev + first of current forms a diphthong, join them (fix over-split).
-        if (lasSEst === "C" || (firstLetLastEst !== "C" && !!this.reverseSearch(conjuntion, this.diphthongsAndtriphthongs, true)))
+        if (lasSEst === "C" || (firstLetLastEst !== "C" && this.isValidVowelCluster(conjuntion)))
             this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
         // Final cleanup
