@@ -1,70 +1,12 @@
 /* ============================================================
-   Spanish Syllabify Test Runner — Usage & Notes (extended intro)
-   ------------------------------------------------------------
-   What this is:
-   A tiny, dependency-free console test runner tailored to validate a
-   function named `syllabify(word)` that returns an array of syllables.
-   It’s written in vanilla JS so you can run it directly in the browser
-   console or in Node.js without setup.
 
-   How to use:
-   1) Make sure you have a global `syllabify` function available. If you
-      already expose `spell.splitInSyllables`, the provided wrapper will
-      call it for you. If your function has a different name, either
-      rename it or update the wrapper once at the top.
-   2) Paste this whole file after your implementation and run `test();`.
-      You’ll see green checkmarks (✔) for passing cases and red crosses (✖)
-      for failing ones, along with a compact summary and pass rate.
 
-   What the tests check:
-   - Baseline CV/CVC patterns to ensure the core segmentation works.
-   - Diphthongs/triphthongs (ai, ei, ia, ie, io, iu, ui, etc.) including
-     cases with dieresis (ü) and words where ‘u’ is mute after q/g.
-   - Hiatus triggered by accent marks (í/ú frente a a/e/o), so accented
-     weak vowels break diphthongs as expected.
-   - Consonant clusters in onset (pl, pr, bl, br, cl, cr, gl, gr, fl, fr,
-     tr, dr) and “s + consonant” orthographic sequences (es- + CC).
-   - Digraphs (ch, ll, rr) treated as single consonants for splitting.
-   - Silent ‘h’ mediation between vowels (ahí, prohíbo, vehículo).
-   - Robustness with Unicode, case, and diacritics (Ñ, Á, É, Í, Ó, Ú, Ü).
-   - Borrowings/cultismos válidos (psicología, gnóstico, pterodáctilo,
-     mnémico) to ensure your engine tolerates learned words and less
-     frequent onset clusters.
-   - Invariants that guard against empty syllables and ensure the joined
-     output equals the input.
+ ***  USE  testSylabifier() FOR SYLLABLES SPLITING TESTS
 
-   EXTRA_CASES:
-   The “EXTRA 500” block extends coverage with everyday vocabulary,
-   clusters, endings, and tricky joints. It has been curated to avoid
-   non-castilian spellings and fix doubtful orthographies (e.g., cigüeña,
-   crédito, neumático). It’s designed to stress common edge paths of the
-   algorithm without depending on external libraries.
+ ***  USE  testCorrect() FOR SPELLING CHECKER TESTS
 
-   About RAE verification:
-   This file does not embed links or citations. If you need audit-grade
-   provenance, you can label each item and maintain a separate mapping
-   with DLE references. The intent here is pragmatic coverage: realistic
-   words that exercise Spanish syllabification rules in practice.
 
-   Interpreting failures:
-   A failure means your `syllabify` returned a different array than the
-   expected one for that word. Compare the expected syllable boundaries
-   with yours and focus on:
-   - Diphthong vs. hiatus decisions (accent on í/ú is decisive).
-   - Treatment of ü and mute ‘u’ in que/qui/gue/gui vs. güe/güi.
-   - Onset clusters and whether a consonant should coda-attach left or
-     onset-attach right.
-   - Final repairs (e.g., not leaving stranded ‘ch/ll’ at word end).
-
-   Tips:
-   - Normalize to lowercase and NFC/NFD consistently inside your logic.
-   - Time your function if you like: wrap the call with console.time/timeEnd.
-   - To add a new case, push ["palabra", ["si", "lá", "bas"]] to the
-     relevant suite or EXTRA_CASES, keeping arrays exact and in order.
-
-   Run:
-   Paste below your implementation and call `test();`. That’s it.
-   ============================================================ */
+ ============================================================ */
 
 // ---- Guard: require global syllabify ----
 function syllabify(w) {
@@ -76,7 +18,7 @@ if (typeof syllabify !== "function") {
 }
 
 // ---- Minimal test framework (console-based) ----
-const test = () => {
+const testSylabifier = () => {
     const state = { total: 0, passed: 0, failed: 0, currentSuite: [] };
 
     const green = (s) => `%c${s}`;
@@ -836,5 +778,5 @@ const test = () => {
     log(summary, failed ? rcss : gcss);
 };
 
-// Ejecuta
-//test();
+// Execute silabifier test
+//testSylabifier();

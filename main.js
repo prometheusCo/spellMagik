@@ -674,8 +674,7 @@ class magikEspellCheck extends Syllabifier {
         let V2F = this.isF2Valid(syllable),
             F3C = syllable.slice(0, 3),
             prevInsert = V2F ? syllable[0] : syllable[1],
-            makeTest = prev => this.replaceCharAt(syllable, 1, prev + this.vowelsWildcard),
-            exp = /[#|$]/;
+            makeTest = prev => this.replaceCharAt(syllable, 1, prev + this.vowelsWildcard);
 
         // If the first three characters are consonants and the test  syllable (CVC) is valid
         // Change syllable to test pattern
@@ -788,7 +787,6 @@ class magikEspellCheck extends Syllabifier {
             F2C.indexOf(this.vowelsWildcard) >= 0 ? vowels.forEach((l) => { start.push(F2C.replace(this.vowelsWildcard, l)) })
                 : consonants.forEach((l) => { start.push(F2C.replace(this.consonantssWildcard, l)) });
         }
-
 
         // PATTER MIDDLE: remove first two chars and terminal suffix to isolate the middle-run length
         middle = middle.slice(2, -(end.length))
