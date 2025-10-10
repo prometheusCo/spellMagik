@@ -855,24 +855,20 @@ class magikEspellCheck extends Syllabifier {
         //console.log(patterns);
         let invf2l = ogWord[1] + ogWord[0];
         let noiseCache = this.noiseCache;
-        let currentPool = [];
 
         let sugestions = [];
         patterns.forEach((_pattern) => {
 
 
             let [pattern, ln] = _pattern;
-            let f2c = pattern.slice(0, 2);
-            let pool = (currentPool.length === 0 || currentPool[0].slice(0, 2) !== f2c)
-                ? (!!this.getSet(pattern, ln) ? [...this.getSet(pattern, ln)] : false) : currentPool;
+            let set = this.getSet(pattern, ln)
 
-            if (!pool) return;
+            if (!set) return;
 
-            (pool[0] !== currentPool[0]) ? currentPool = [...currentPool] : null;
             let reg = new RegExp(pattern, "i")
+            let pool = [...set];
 
             pool.forEach((w) => {
-
 
                 if (ln !== w.length || noiseCache.has(w) || !reg.test(w)) return;
 
