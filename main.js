@@ -68,13 +68,15 @@ class coreMethods {
     vowels = new Set([...this.weakVowels, ...this.strongVowels, ...[this.vowelsWildcard]]);
 
     // Consonant classes (sound types) used to validate onsets/clusters
-    plosives = new Set(["PC", "p", "t", "k", "b", "d", "g", this.consonantssWildcard]);
-    fricatives = new Set(["FC", "f", "s", "j", "z", this.consonantssWildcard]);
-    affricates = new Set(["AFC", "ch", this.consonantssWildcard]);
-    nasals = new Set(["NC", "m", "n", "ñ", this.consonantssWildcard]);
-    laterals = new Set(["LC", "l", "ll", this.consonantssWildcard]);
-    approximants = new Set(["AC", "b", "x", this.consonantssWildcard]);
-    vibrants = new Set(["BC", "r", "rr", this.consonantssWildcard]);
+    plosives = ["PC", "p", "t", "k", "b", "d", "g", this.consonantssWildcard];
+    fricatives = ["FC", "f", "s", "j", "z", this.consonantssWildcard];
+    affricates = ["AFC", "ch", this.consonantssWildcard];
+    nasals = ["NC", "m", "n", "ñ", this.consonantssWildcard];
+    laterals = ["LC", "l", "ll", this.consonantssWildcard];
+    approximants = ["AC", "b", "x", this.consonantssWildcard];
+    vibrants = ["BC", "r", "rr", this.consonantssWildcard];
+
+
 
 
     // correct two-consonant onset clusters by consonant TYPE (encoded)
@@ -348,13 +350,13 @@ class coreMethodsExt extends coreMethods {
                 return "PC";
             }
 
-            if (this.plosives.has(wordAsArray[index])) return [...this.plosives][0];
-            if (this.fricatives.has(wordAsArray[index])) return [...this.fricatives][0];
-            if (this.affricates.has(wordAsArray[index])) return [...this.affricates][0];
-            if (this.nasals.has(wordAsArray[index])) return [...this.nasals][0];
-            if (this.laterals.has(wordAsArray[index])) return [...this.laterals][0];
-            if (this.approximants.has(wordAsArray[index])) return [...this.approximants][0];
-            if (this.vibrants.has(wordAsArray[index])) return [...this.vibrants][0];
+            if (this.plosives.includes(wordAsArray[index])) return this.plosives[0];
+            if (this.fricatives.includes(wordAsArray[index])) return this.fricatives[0];
+            if (this.affricates.includes(wordAsArray[index])) return this.affricates[0];
+            if (this.nasals.includes(wordAsArray[index])) return this.nasals[0];
+            if (this.laterals.includes(wordAsArray[index])) return this.laterals[0];
+            if (this.approximants.includes(wordAsArray[index])) return this.approximants[0];
+            if (this.vibrants.includes(wordAsArray[index])) return this.vibrants[0];
 
             return "C";
         });
@@ -603,21 +605,26 @@ class magikEspellCheck extends Syllabifier {
             const f2c = word.slice(0, 2).toLowerCase();
             const fw = f2c.slice(0, 1).toLowerCase();
             const we = word[word.length - 1];
+            const ln = word.length;
 
             // If first level (a, b ,c ... [first letter]) is undef for this word, we make it
             if (!this.dictMapped.has(`${fw}`))
                 this.dictMapped.set(`${fw}`, new Map());
 
-            // If second level for this word (ab, ac, ad... [first 2 letters]) is also undef we made it
+            // If second level is also undef we made it
             if (!this.dictMapped.get(`${fw}`).has(`${f2c}`))
                 this.dictMapped.get(`${fw}`).set(`${f2c}`, new Map())
 
-            // If third level for this word (ab***, ab***... [length]) is also undef we made it
+            // If third level...
             if (!this.dictMapped.get(`${fw}`).get(`${f2c}`).has(`${we}`))
-                this.dictMapped.get(`${fw}`).get(`${f2c}`).set(`${we}`, new Set())
+                this.dictMapped.get(`${fw}`).get(`${f2c}`).set(`${we}`, new Map())
+
+            // If 4th level..
+            if (!this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${we}`).has(`${ln}`))
+                this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${we}`).set(`${ln}`, new Set())
 
             // Storing word in set...
-            this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${we}`).add(word.toLowerCase());
+            this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${we}`).get(`${ln}`).add(word.toLowerCase());
 
         })
 
@@ -627,7 +634,7 @@ class magikEspellCheck extends Syllabifier {
         // To proper warm up JIT given word must be incorrect,
         // otherwise it wouldn't fully warm up
         // Also code is writen to work based on the second case
-        this.warmStart ? this.correct("itjheras", this._null) : null;
+        this.warmStart ? this.correct("aslones", this._null) : null;
 
         console.log("Dictionary fully loaded");
     }
@@ -636,16 +643,19 @@ class magikEspellCheck extends Syllabifier {
     // Get Set of candidates sharing same first two chars, if legal.
     // Returns Set<string> or false if missing/illegal prefix.
     //
-    getSet(word) {
+    getSet(word, len = false) {
 
         const f2c = word.slice(0, 2);
         const fc = f2c.slice(0, 1);
         const we = word[word.length - 1];
+        const ln = !len ? word.length : len;
 
-        if (!this.dictMapped.get(`${fc}`) || !this.dictMapped.get(`${fc}`).has(`${f2c}`))
+        try {
+            return this.dictMapped.get(`${fc}`).get(`${f2c}`).get(`${we}`).get(`${ln}`);
+
+        } catch (error) {
             return false;
-
-        return this.dictMapped.get(`${fc}`).get(`${f2c}`).get(`${we}`);
+        }
 
     }
 
@@ -826,7 +836,7 @@ class magikEspellCheck extends Syllabifier {
                 if (/[§|~]/.test(st))
                     continue;
 
-                finalCandidates.push([expReg, 2 + n + 1]);
+                finalCandidates.push([expReg, (st.length + (n + index)) + end.length]);
             }
         })
         return finalCandidates;
@@ -842,7 +852,6 @@ class magikEspellCheck extends Syllabifier {
     //
     returnSuggestions(patterns, ogWord) {
 
-        //console.log(patterns)
         let invf2l = ogWord[1] + ogWord[0];
         let noiseCache = this.noiseCache;
         let currentPool = [];
@@ -850,10 +859,11 @@ class magikEspellCheck extends Syllabifier {
         let sugestions = [];
         patterns.forEach((_pattern) => {
 
+
             let [pattern, ln] = _pattern;
             let f2c = pattern.slice(0, 2);
             let pool = (currentPool.length === 0 || currentPool[0].slice(0, 2) !== f2c)
-                ? (!!this.getSet(pattern) ? [...this.getSet(pattern)] : false) : currentPool;
+                ? (!!this.getSet(pattern, ln) ? [...this.getSet(pattern, ln)] : false) : currentPool;
 
             if (!pool) return;
 
@@ -863,7 +873,7 @@ class magikEspellCheck extends Syllabifier {
             pool.forEach((w) => {
 
 
-                if (noiseCache.has(w) || !reg.test(w)) return;
+                if (ln !== w.length || noiseCache.has(w) || !reg.test(w)) return;
 
                 let score = this.diffScoreStrings(ogWord, w);
 
