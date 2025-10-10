@@ -54,6 +54,7 @@ class coreMethods {
     //  Warm-up run to avoid first-call latency
     warmStart = true;
 
+
     //  Wildcard tokens used INSIDE candidate patterns:
     //  vowelsWildcard => matches any vowel; consonantssWildcard => any consonant
     vowelsWildcard = "§";
@@ -75,8 +76,6 @@ class coreMethods {
     laterals = ["LC", "l", "ll", this.consonantssWildcard];
     approximants = ["AC", "b", "x", this.consonantssWildcard];
     vibrants = ["BC", "r", "rr", this.consonantssWildcard];
-
-
 
 
     // correct two-consonant onset clusters by consonant TYPE (encoded)
@@ -145,7 +144,7 @@ class coreMethods {
     //
     _null = a => a;
 
-
+    //
     //
     // Validate syllable ending using primary/secondary blacklists + exceptions
     hasValidEnding(str) {
@@ -634,7 +633,7 @@ class magikEspellCheck extends Syllabifier {
         // To proper warm up JIT given word must be incorrect,
         // otherwise it wouldn't fully warm up
         // Also code is writen to work based on the second case
-        this.warmStart ? this.correct("aslones", this._null) : null;
+        this.warmStart ? this.correct("rvluchn", this._null) : null;
 
         console.log("Dictionary fully loaded");
     }
@@ -773,6 +772,7 @@ class magikEspellCheck extends Syllabifier {
             syllables = ogSyllabifier.splitInSyllables(syllables.join(""))
             epochs++;
         }
+
         return syllables;
     }
 
@@ -784,7 +784,6 @@ class magikEspellCheck extends Syllabifier {
     //   - ending wildcard alignment
     //
     generateMutations(word) {
-
 
         let candidate = this.splitInSyllables(word);
         let F2C = candidate.join("").slice(0, 2);
@@ -811,7 +810,8 @@ class magikEspellCheck extends Syllabifier {
 
         // IT WAS MEANT TO START WITH THE FIRST 2 LETTERS  ORDER SWAPPED 
         if (this.isValidSyllable(F2C[1] + F2C[0]))
-            start.push(F2C[1] + F2C[0]);
+            start.unshift(F2C[1] + F2C[0]);
+
 
         // WORD'S START VRS IF ANY (expand wildcard to concrete vowels/consonants)
         if (/[§|~]/.test(F2C)) {
@@ -852,16 +852,16 @@ class magikEspellCheck extends Syllabifier {
     //
     returnSuggestions(patterns, ogWord) {
 
-        //console.log(patterns);
         let invf2l = ogWord[1] + ogWord[0];
         let noiseCache = this.noiseCache;
-
         let sugestions = [];
-        patterns.forEach((_pattern) => {
 
+
+        patterns.some((_pattern) => {
 
             let [pattern, ln] = _pattern;
             let set = this.getSet(pattern, ln)
+            let isSwaped = invf2l === pattern.slice(0, 2);
 
             if (!set) return;
 
@@ -875,15 +875,26 @@ class magikEspellCheck extends Syllabifier {
                 let score = this.diffScoreStrings(ogWord, w);
 
                 // If the first two letters are swapped, reduce the difference level
-                invf2l == w.slice(0, 2) ? score = score + this.diffTolerance : null;
+                isSwaped ? score = score + this.diffTolerance : null;
 
                 if (score < this.stringDiff) return;
 
                 noiseCache.add(w);
                 sugestions.push([w, score]);
+
             })
+
+            //Code bellow changes flow to perform faster in swaped letters cases
+            if (isSwaped) {
+
+                sugestions = sugestions.sort((a, b) => b[1] - a[1]);
+                if (sugestions.length >= this.maxNumSuggestions)
+                    return true;
+            }
+
         })
-        return sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions).map((s) => this.addAccents(s));
+        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
+        return sugestions.map((s) => this.addAccents(s));
     }
 
     //
