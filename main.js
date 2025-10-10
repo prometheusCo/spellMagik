@@ -49,7 +49,7 @@ class coreMethods {
     =====> */  diffTolerance = 0.15;
 
     //  Cap on suggestions returned
-    maxNumSuggestions = 10;
+    maxNumSuggestions = 20;
 
     //  Warm-up run to avoid first-call latency
     warmStart = true;
@@ -530,6 +530,9 @@ class Syllabifier extends coreMethodsExt {
 
     splitInSyllables(word, pipeLineEnd = false) {
 
+        if (pipeLineEnd)
+            word = this.normalize(word);
+
         let syllables = []; // Final syllables array; each element is one syllable
         let syllablesTmp = ""; // Temp buffer to store consonants between detected vowels
         let wordAsArray = word.split(""); // Word as an array of letters
@@ -593,14 +596,13 @@ class magikEspellCheck extends Syllabifier {
     prepareDict() {
 
         this.dictData = this.dictData.split(",");
-        this.dictData[this.dictData.length - 1] = this.dictData.at(-1).replace("'", "").trim();
-        this.dictData[0] = this.dictData[0].replace("'", "").trim();
 
         this.dictData.forEach((word) => {
 
-            const f2c = word.slice(0, 2);
-            const fw = f2c.slice(0, 1);
-            const wl = word.length;
+            word = this.normalize(word)
+            const f2c = word.slice(0, 2).toLowerCase();
+            const fw = f2c.slice(0, 1).toLowerCase();
+            const we = word[word.length - 1];
 
             // If first level (a, b ,c ... [first letter]) is undef for this word, we make it
             if (!this.dictMapped.has(`${fw}`))
@@ -608,16 +610,19 @@ class magikEspellCheck extends Syllabifier {
 
             // If second level for this word (ab, ac, ad... [first 2 letters]) is also undef we made it
             if (!this.dictMapped.get(`${fw}`).has(`${f2c}`))
-                this.dictMapped.get(`${fw}`).set(`${f2c}`, new Set())
+                this.dictMapped.get(`${fw}`).set(`${f2c}`, new Map())
+
+            // If third level for this word (ab***, ab***... [length]) is also undef we made it
+            if (!this.dictMapped.get(`${fw}`).get(`${f2c}`).has(`${we}`))
+                this.dictMapped.get(`${fw}`).get(`${f2c}`).set(`${we}`, new Set())
 
             // Storing word in set...
-            this.dictMapped.get(`${fw}`).get(`${f2c}`).add(word);
+            this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${we}`).add(word.toLowerCase());
 
         })
 
-        localStorage.setItem("magikEspellCheckDict", this.dictData)
         this.ready = true;
-        this.dictData = null;
+        //this.dictData = null;
 
         // To proper warm up JIT given word must be incorrect,
         // otherwise it wouldn't fully warm up
@@ -635,12 +640,12 @@ class magikEspellCheck extends Syllabifier {
 
         const f2c = word.slice(0, 2);
         const fc = f2c.slice(0, 1);
-        const wl = word.length;
+        const we = word[word.length - 1];
 
         if (!this.dictMapped.get(`${fc}`) || !this.dictMapped.get(`${fc}`).has(`${f2c}`))
             return false;
 
-        return this.dictMapped.get(`${fc}`).get(`${f2c}`);
+        return this.dictMapped.get(`${fc}`).get(`${f2c}`).get(`${we}`);
 
     }
 
@@ -837,22 +842,23 @@ class magikEspellCheck extends Syllabifier {
     //
     returnSuggestions(patterns, ogWord) {
 
-        //console.log(patterns)
+        console.log(patterns)
         let invf2l = ogWord[1] + ogWord[0];
         let noiseCache = this.noiseCache;
 
         let sugestions = [];
         patterns.forEach((pattern) => {
 
-            let set = this.getSet(pattern.slice(0, 2));
+            let set = this.getSet(pattern);
             if (!set) return;
             let reg = new RegExp(pattern, "i")
             let pool = [...set];
-            let ln = (pattern.split("[a-z]{").join("").length - 2) + parseInt(pattern.split("{")[1].split("}")[0]);
 
             pool.forEach((w) => {
 
-                if (noiseCache.has(w) || w.length !== ln || !reg.test(w)) return;
+                if (w === "tijeras") console.log(w)
+
+                if (noiseCache.has(w) || !reg.test(w)) return;
 
                 let score = this.diffScoreStrings(ogWord, w);
 
@@ -907,7 +913,8 @@ class magikEspellCheck extends Syllabifier {
                 return true;
             }
 
-            let mutations = this.generateMutations(word)
+            word = this.normalize(word);
+            let mutations = this.generateMutations(word);
 
             let sugestions = this.returnSuggestions([...mutations], word);
             this.isValid(start) && !this.warmStart ? this.printTime(start, " EXEC TIME", 10) : null;
