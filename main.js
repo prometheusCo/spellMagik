@@ -627,25 +627,6 @@ class magikEspellCheck extends Syllabifier {
 
     }
 
-    //
-    // Group words by first two letters and length (used for faster pattern search)
-    //
-    groupWords(arr) {
-
-        return arr
-            .sort((a, b) => a.length - b.length || a.localeCompare(b))
-            .reduce((groups, word) => {
-                const key = word.slice(0, 2) + "_" + word.length;
-                let group = groups.find(g => g.key === key);
-                if (!group) {
-                    group = { key, words: [] };
-                    groups.push(group);
-                }
-                group.words.push(word);
-                return groups;
-            }, [])
-            .map(g => g.words);
-    }
 
     //
     // Check:
@@ -809,10 +790,12 @@ class magikEspellCheck extends Syllabifier {
 
         // PATTERN END: if end contains wildcard, reduce to its suffix beginning at wildcard
         if (end.search(/[§|~]/) >= 0)
-            end = end.slice(end.search(/[§|~]/))
+            end = end.slice(end.search(/[§|~]/) + 1)
+
 
         // PATTER MIDDLE: remove first two chars and terminal suffix to isolate the middle-run length
         middle = middle.slice(2, -(end.length))
+
 
         // GENERATING FINAL MUTATIONS TO TEST AGAINST CLUSTER
         start.forEach((st) => {
