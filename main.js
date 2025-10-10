@@ -37,7 +37,7 @@ class coreMethods {
     //
     //  CONF ZONE
     //  Remote dictionary (comma-separated tokens; optionally gzip-compressed)
-    dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionaryC.txt";
+    dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionary.txt";
 
     //  Max refinement passes when spliting in syllables
     epochs = 3;
@@ -138,6 +138,8 @@ class coreMethods {
     count = (arr, str) => [...arr].filter((a) => a.indexOf(str) >= 0).length
     // Is an string an inverted version of another???
     isInverted = (a, b) => a.split("").reverse().join("") == b
+    //
+    normalize = s => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, (m, i, a) => (m === '\u0303' && /[nN]/.test(a[i - 1])) ? m : '').normalize('NFC') : s;
     //
     _null = a => a;
 
@@ -299,6 +301,15 @@ class coreMethods {
         // Glue char to neighbor
         arr[to] = direction === "right" ? char + arr[to] : arr[to] + char;
         return arr;
+    }
+
+    //
+    // Checjk if a normalized word must be accented, if is the case
+    // return the rigth version, used at the end of the pipeline
+    addAccents(word) {
+
+
+        return word;
     }
 
 }
@@ -512,7 +523,7 @@ class Syllabifier extends coreMethodsExt {
     //   - After each push, apply local rules to fix boundary mistakes.
     //
 
-    splitInSyllables(word) {
+    splitInSyllables(word, pipeLineEnd = false) {
 
         let syllables = []; // Final syllables array; each element is one syllable
         let syllablesTmp = ""; // Temp buffer to store consonants between detected vowels
@@ -548,7 +559,7 @@ class Syllabifier extends coreMethodsExt {
             tmpPush(currentLetter);
             syllables = this.rulesApply(syllables);
         }
-        return this.rulesApply(syllables);
+        return !pipeLineEnd ? this.rulesApply(syllables) : this.addAccents(this.rulesApply(syllables));
     }
 
 }
@@ -606,7 +617,7 @@ class magikEspellCheck extends Syllabifier {
         // To proper warm up JIT given word must be incorrect,
         // otherwise it wouldn't fully warm up
         // Also code is writen to work based on the second case
-        this.warmStart ? this.correct("pkdfmos", this._null) : null;
+        this.warmStart ? this.correct("aslons", this._null) : null;
 
         console.log("Dictionary fully loaded");
     }
@@ -754,6 +765,7 @@ class magikEspellCheck extends Syllabifier {
     //
     generateMutations(word) {
 
+
         let candidate = this.splitInSyllables(word);
         let F2C = candidate.join("").slice(0, 2);
         let finalCandidates = [];
@@ -823,7 +835,6 @@ class magikEspellCheck extends Syllabifier {
         //console.log(patterns)
         let invf2l = ogWord[1] + ogWord[0];
         let noiseCache = this.noiseCache;
-        let lastOgL = ogWord[ogWord.length - 1];
 
         let sugestions = [];
         patterns.forEach((pattern) => {
@@ -849,7 +860,7 @@ class magikEspellCheck extends Syllabifier {
                 sugestions.push([w, score]);
             })
         })
-        return sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
+        return sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions).map((s) => this.addAccents(s));
     }
 
     //
@@ -868,6 +879,7 @@ class magikEspellCheck extends Syllabifier {
         if (!callBack && !this.ready)
             throw new Error("For using correct() without any callback, dictionary must be loaded first!");
 
+
         // comment this if you dont want to mesure exec time
         const start = performance.now();
         let rInt; // use to clear callback int
@@ -876,12 +888,13 @@ class magikEspellCheck extends Syllabifier {
         // You call correct method with the callback to exec return as 2nd argument
         //  If  you don't like it you can swith to a promise paradigm type
         //
-        const waitTillReady = () => { rInt = setInterval(() => { this.ready ? clearInterval(rInt) & run() : null }, 500) }
+        const waitTillReady = () => {
+            rInt = setInterval(() => { this.ready ? clearInterval(rInt) & run() : null }, 500)
+        }
 
         const run = () => {
 
             this.noiseCache = new Set([]);
-            word = word.toLowerCase();
 
             if (this.check(word)) {
 
@@ -906,7 +919,6 @@ class magikEspellCheck extends Syllabifier {
 
         if (this.ready)
             return run();
-
     }
 
 }

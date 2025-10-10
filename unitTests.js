@@ -7,11 +7,11 @@
 
 
  ============================================================ */
+let n = new Syllabifier();
 
 // ---- Guard: require global syllabify ----
 function syllabify(w) {
-    let n = new Syllabifier()
-    return n.splitInSyllables(w);
+    return n.splitInSyllables(w, true);
 }
 if (typeof syllabify !== "function") {
     throw new Error("Missing global function `syllabify(word)`. Define it before running the tests.");
