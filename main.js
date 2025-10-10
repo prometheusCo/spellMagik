@@ -37,7 +37,7 @@ class coreMethods {
     //
     //  CONF ZONE
     //  Remote dictionary (comma-separated tokens; optionally gzip-compressed)
-    dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionaryCompressed.txt";
+    dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionaryC.txt";
 
     //  Max refinement passes when spliting in syllables
     epochs = 3;
@@ -49,7 +49,7 @@ class coreMethods {
     =====> */  diffTolerance = 0.15;
 
     //  Cap on suggestions returned
-    maxNumSuggestions = 20;
+    maxNumSuggestions = 10;
 
     //  Warm-up run to avoid first-call latency
     warmStart = true;
@@ -627,7 +627,7 @@ class magikEspellCheck extends Syllabifier {
         // To proper warm up JIT given word must be incorrect,
         // otherwise it wouldn't fully warm up
         // Also code is writen to work based on the second case
-        this.warmStart ? this.correct("aslons", this._null) : null;
+        this.warmStart ? this.correct("itjheras", this._null) : null;
 
         console.log("Dictionary fully loaded");
     }
@@ -826,7 +826,7 @@ class magikEspellCheck extends Syllabifier {
                 if (/[§|~]/.test(st))
                     continue;
 
-                finalCandidates.push(expReg);
+                finalCandidates.push([expReg, 2 + n + 1]);
             }
         })
         return finalCandidates;
@@ -842,21 +842,26 @@ class magikEspellCheck extends Syllabifier {
     //
     returnSuggestions(patterns, ogWord) {
 
-        console.log(patterns)
+        //console.log(patterns)
         let invf2l = ogWord[1] + ogWord[0];
         let noiseCache = this.noiseCache;
+        let currentPool = [];
 
         let sugestions = [];
-        patterns.forEach((pattern) => {
+        patterns.forEach((_pattern) => {
 
-            let set = this.getSet(pattern);
-            if (!set) return;
+            let [pattern, ln] = _pattern;
+            let f2c = pattern.slice(0, 2);
+            let pool = (currentPool.length === 0 || currentPool[0].slice(0, 2) !== f2c)
+                ? (!!this.getSet(pattern) ? [...this.getSet(pattern)] : false) : currentPool;
+
+            if (!pool) return;
+
+            (pool[0] !== currentPool[0]) ? currentPool = [...currentPool] : null;
             let reg = new RegExp(pattern, "i")
-            let pool = [...set];
 
             pool.forEach((w) => {
 
-                if (w === "tijeras") console.log(w)
 
                 if (noiseCache.has(w) || !reg.test(w)) return;
 
