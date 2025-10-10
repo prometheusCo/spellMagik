@@ -852,7 +852,7 @@ class magikEspellCheck extends Syllabifier {
     //
     returnSuggestions(patterns, ogWord) {
 
-        console.log(patterns);
+        //console.log(patterns);
         let invf2l = ogWord[1] + ogWord[0];
         let noiseCache = this.noiseCache;
         let currentPool = [];
