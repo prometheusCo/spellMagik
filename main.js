@@ -602,6 +602,10 @@ class magikEspellCheck extends Syllabifier {
         localStorage.setItem("magikEspellCheckDict", this.dictData)
         this.ready = true;
         this.dictData = null;
+
+        // To proper warm up JIT given word must be incorrect,
+        // otherwise it wouldn't fully warm up
+        // Also code is writen to work based on the second case
         this.warmStart ? this.correct("pkdfmos", this._null) : null;
 
         console.log("Dictionary fully loaded");
@@ -763,18 +767,18 @@ class magikEspellCheck extends Syllabifier {
             'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z'
         ]
 
-        // STARTS IN V
+        // STARTS IN C BUT IT WAS MEANT TO START IN V
         if (this.getEst(startLetter) === "C") {
             vowels.forEach((l) => { start.push(l + startLetter) });
             vowels.forEach((l) => { start.push(l + word.slice(1, 2)) });
         }
 
-        // STARTS IN C
+        // STARTS IN V BUT IT WAS MEANT TO START IN C
         if (this.getEst(startLetter) === "V" && this.isValidSyllable(this.consonantssWildcard + startLetter))
             consonants.forEach((l) => { start.push(l + startLetter) });
 
 
-        // STARTS  WITH SWAPPED LETTERS
+        // IT WAS MEANT TO START WITH THE FIRST 2 LETTERS  ORDER SWAPPED 
         if (this.isValidSyllable(F2C[1] + F2C[0]))
             start.push(F2C[1] + F2C[0]);
 
@@ -784,10 +788,6 @@ class magikEspellCheck extends Syllabifier {
             F2C.indexOf(this.vowelsWildcard) >= 0 ? vowels.forEach((l) => { start.push(F2C.replace(this.vowelsWildcard, l)) })
                 : consonants.forEach((l) => { start.push(F2C.replace(this.consonantssWildcard, l)) });
         }
-
-        // PATTERN END: if end contains wildcard, reduce to its suffix beginning at wildcard
-        if (end.search(/[§|~]/) >= 0)
-            end = end.slice(end.search(/[§|~]/) + 1)
 
 
         // PATTER MIDDLE: remove first two chars and terminal suffix to isolate the middle-run length
@@ -861,10 +861,14 @@ class magikEspellCheck extends Syllabifier {
     //   2) If the word is valid (exact match in its bucket), return true (synchronous)
     //   3) Compute scored suggestions
     //   4) If not warm-starting and callback exists, invoke callback(suggestions)
-    // Note:
+    // Note:warmStart
     //   - Uses a setInterval-based "waitTillReady" to keep a callback-style API (no Promises).
     //
     correct(word, callBack = false) {
+
+        // Early error  return depending on wether the dict is ready or not, and callback is false
+        if (!callBack && !this.ready)
+            throw new Error("For using correct() without any callback, dictionary must be loaded first!");
 
         // comment this if you dont want to mesure exec time
         const start = performance.now();
@@ -876,31 +880,34 @@ class magikEspellCheck extends Syllabifier {
         //
         const waitTillReady = () => { rInt = setInterval(() => { this.ready ? clearInterval(rInt) & run() : null }, 500) }
 
-        // Early error  return depending on wether the dict is ready or not, and callback is false
-        if (!callBack && !this.ready)
-            throw new Error("For using correct() without any callback, dictionary must be loaded first!");
-
         const run = () => {
 
             this.noiseCache = new Set([]);
             word = word.toLowerCase();
 
-            if (this.check(word))
-                return callBack(true);
+            if (this.check(word)) {
+
+                if (!!callBack) return callBack(true);
+                return true;
+            }
 
             let mutations = this.generateMutations(word)
 
             let sugestions = this.returnSuggestions([...mutations], word);
             this.isValid(start) && !this.warmStart ? this.printTime(start, " EXEC TIME", 10) : null;
 
-            if (!this.warmStart && !!callBack)
-                return callBack(sugestions);
-
             this.warmStart ? this.warmStart = false : null;
 
+            if (!!callBack)
+                return callBack(sugestions);
+
+            return sugestions;
         }
 
-        (this.ready) ? run() : waitTillReady();
+        (!this.ready) ? waitTillReady() : null;
+
+        if (this.ready)
+            return run();
 
     }
 
