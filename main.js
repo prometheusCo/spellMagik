@@ -37,7 +37,7 @@ class coreMethods {
     //
     //  CONF ZONE
     //  Remote dictionary (comma-separated tokens; optionally gzip-compressed)
-    dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionary.txt";
+    dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionaryCompressed.txt";
 
     //  Max refinement passes when spliting in syllables
     epochs = 3;
@@ -160,31 +160,28 @@ class coreMethods {
     //
     // Load dictionary into memory, supporting plain text, base64, or gzip (browser-native DecompressionStream)
     // Persists raw string in localStorage to avoid refetching across sessions.
-    dictionaryLoad(url) {
+    // Load dict from localStorage or URL; supports plain, base64, and gzip (via DecompressionStream)
+    dictionaryLoad = (url) => {
 
-        const loadedData = localStorage.getItem("magikEspellCheckDict");
-        if (this.isValid(loadedData)) { this.dictData = loadedData; this.prepareDict(); return; }
-
-        const ok = r => (r.ok ? r : Promise.reject(new Error(`Failed: ${r.status} ${r.statusText}`)));
+        const KEY = "magikEspellCheckDict";
+        const ok = r => r.ok ? r : Promise.reject(new Error(`Failed: ${r.status} ${r.statusText}`));
         const set = t => (this.dictData = t, t && this.prepareDict());
 
-        // Heuristic base64 detector (length%4 + charset)
+        // Heuristic base64 detector
         const isB64 = s => /^[A-Za-z0-9+/=\s]+$/.test(s) && (s.replace(/\s+/g, "").length % 4 === 0);
-        // decode base64 into bytes
         const fromB64 = s => {
             const bin = atob(s.replace(/\s+/g, ""));
             const out = new Uint8Array(bin.length);
             for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
             return out;
         };
-        // treat input as raw binary string
         const fromBin = s => {
             const out = new Uint8Array(s.length);
             for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 255;
             return out;
         };
 
-        const toBytes = s => (isB64(s) ? fromB64(s) : fromBin(s));
+        const toBytes = s => isB64(s) ? fromB64(s) : fromBin(s);
         const isGzip = bytes => bytes && bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
         const gunzip = bytes => {
             const ds = new DecompressionStream("gzip");
@@ -192,15 +189,23 @@ class coreMethods {
             return new Response(stream).text();
         };
 
+        const decodeMaybeCompressed = s => {
+            const bytes = toBytes(s);
+            return isGzip(bytes) ? gunzip(bytes) : Promise.resolve(s);
+        };
+
+        // 1) Try localStorage cache (may be gz/base64/plain); decode if needed
+        const cached = localStorage.getItem(KEY);
+        if (this.isValid(cached)) return decodeMaybeCompressed(cached).then(set);
+
+        // 2) Fallback to fetch; store RAW payload, decode for runtime, then prepare
         return fetch(url)
             .then(ok)
             .then(r => r.text())
-            .then(s => {
-                const bytes = toBytes(s);
-                return isGzip(bytes) ? gunzip(bytes) : s; // Skip gunzip if not compressed
-            })
+            .then(raw => decodeMaybeCompressed(raw).then(txt => (localStorage.setItem(KEY, raw), txt)))
             .then(set);
-    }
+    };
+
 
     //
     //
