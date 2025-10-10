@@ -119,8 +119,7 @@ class coreMethods {
     // Simple one-liner helpers
     //
 
-    // Normalize: lowercase + strip diacritics (unicode-safe)
-    clean = s => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+
     // Absolute value (micro-helper)
     pos = n => n < 0 ? n * (-1) : n;
     // Guard against nullish/empty
@@ -139,6 +138,8 @@ class coreMethods {
     count = (arr, str) => [...arr].filter((a) => a.indexOf(str) >= 0).length
     // Is an string an inverted version of another???
     isInverted = (a, b) => a.split("").reverse().join("") == b
+    //
+    _null = a => a;
 
 
     //
@@ -230,7 +231,6 @@ class coreMethods {
     getEst(word, returnType = "string") {
 
         if (!this.isValid(word)) return "";
-        word = this.clean(word)
         let r = word.split("").map((a) => this.vowels.has(a) ? "V" : "C");
         if (returnType === "string")
             return r.join("");
@@ -463,7 +463,7 @@ class Syllabifier extends coreMethodsExt {
             this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
         //If syllable is still unmutated and is invalid and it's made of 2 CC            
-        if (syllables === ogSyllables && !this.isValidSyllable(syllables.at(-1)) && this.getEst(lastS) === "CC") {
+        if (syllables.join("") === ogSyllables && !this.isValidSyllable(syllables.at(-1)) && this.getEst(lastS) === "CC") {
 
             // we test removing last C, and adding a V at the begining if syllable doesn't end in s
             let test = this.vowelsWildcard + lastS.slice(0, 1);
@@ -602,7 +602,7 @@ class magikEspellCheck extends Syllabifier {
         localStorage.setItem("magikEspellCheckDict", this.dictData)
         this.ready = true;
         this.dictData = null;
-        this.warmStart ? this.correct("pkdmos") : null;
+        this.warmStart ? this.correct("pkdfmos", this._null) : null;
 
         console.log("Dictionary fully loaded");
     }
@@ -614,16 +614,13 @@ class magikEspellCheck extends Syllabifier {
     getSet(word) {
 
         const f2c = word.slice(0, 2);
-        const fw = f2c.slice(0, 1);
+        const fc = f2c.slice(0, 1);
         const wl = word.length;
 
-        if (!this.isF2Valid(word))
+        if (!this.dictMapped.get(`${fc}`) || !this.dictMapped.get(`${fc}`).has(`${f2c}`))
             return false;
 
-        if (!this.dictMapped.get(`${fw}`) || !this.dictMapped.get(`${fw}`).has(`${f2c}`))
-            return false;
-
-        return this.dictMapped.get(`${fw}`).get(`${f2c}`);
+        return this.dictMapped.get(`${fc}`).get(`${f2c}`);
 
     }
 
@@ -881,7 +878,7 @@ class magikEspellCheck extends Syllabifier {
 
         // Early error  return depending on wether the dict is ready or not, and callback is false
         if (!callBack && !this.ready)
-            throw new Error("For using correct without any callback dictionary must be loaded and ready!");
+            throw new Error("For using correct() without any callback, dictionary must be loaded first!");
 
         const run = () => {
 
