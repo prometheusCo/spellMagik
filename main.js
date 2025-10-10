@@ -386,7 +386,7 @@ class coreMethodsExt extends coreMethods {
         const syllableEstF3 = syllableEst.slice(0, 3);
         const isValidf3c = this.isValidVowelCluster(f3l);
 
-        const hasVVV = /VVV/.test(syllable);
+        const hasVVV = /VVV/.test(syllableEst);
 
         if (syllableEst === "C")
             return false;
@@ -430,7 +430,7 @@ class Syllabifier extends coreMethodsExt {
     //
     rulesApply = (syllables) => {
 
-        const ogSyllables = syllables;
+        const ogSyllables = [...syllables].join("");
         const lastS = syllables[syllables.length - 1];
         const lastLastS = syllables[syllables.length - 2] ?? false;
 
@@ -473,7 +473,7 @@ class Syllabifier extends coreMethodsExt {
 
         // If syllable is still unmutated  we look for an ending valid syllable from rigth to left
         // oposed to the normal flow => from left to rigth
-        if (syllables === ogSyllables)
+        if (syllables.join("") === ogSyllables)
             syllables = this.cutUntilTrue(syllables);
 
         // Final cleanup
@@ -617,7 +617,7 @@ class magikEspellCheck extends Syllabifier {
         const fw = f2c.slice(0, 1);
         const wl = word.length;
 
-        if (!this.isF2Valid(f2c))
+        if (!this.isF2Valid(word))
             return false;
 
         if (!this.dictMapped.get(`${fw}`) || !this.dictMapped.get(`${fw}`).has(`${f2c}`))
@@ -895,6 +895,10 @@ class magikEspellCheck extends Syllabifier {
         //  If  you don't like it you can swith to a promise paradigm type
         //
         const waitTillReady = () => { rInt = setInterval(() => { this.ready ? clearInterval(rInt) & run() : null }, 500) }
+
+        // Early error  return depending on wether the dict is ready or not, and callback is false
+        if (!callBack && !this.ready)
+            throw new Error("For using correct without any callback dictionary must be loaded and ready!");
 
         const run = () => {
 
