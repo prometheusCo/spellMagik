@@ -954,7 +954,7 @@ class magikEspellCheck extends Syllabifier {
             throw new Error("For no callback use, a dict must be ready first!");
 
         let start = this.ready ? performance.now() : null;
-        let ogWord = word;
+        let ogWord = word.toLowerCase();
         let rInt; // use to clear callback int
 
         //
@@ -971,7 +971,7 @@ class magikEspellCheck extends Syllabifier {
             // comment this if you dont want to mesure exec time
             this.noiseCache = new Set([]);
             start = !this.isValid(start) && this.ready ? performance.now() : start;
-            word = this.normalize(word);
+            word = this.normalize(word).toLowerCase();
 
             if (this.check(word)) {
 
