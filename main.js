@@ -598,19 +598,18 @@ class magikEspellCheck extends Syllabifier {
     // To proper warm up JIT given words must be incorrect,
     // otherwise it wouldn't fully warm up
     // Also code is writen to work based on that basis
-    handleWarmStartAll() {
+    handleWarmStartAll = async () => {
 
-        return !this.warmStart
-            ? Promise.resolve(null)
-            : Promise.all([
-                this.correct("acsa", this._null),
-                this.correct("rvlucon", this._null),
-                this.correct("pkdmos", this._null),
-                this.correct("aslonfs", this._null),
-                this.correct("aslonhs", this._null)
-            ]);
+        if (!this.warmStart) return null;
 
-    }
+        const results = await Promise.all([
+            this.correct("rvluchn", false, true),
+            this.correct("zqxter", false, true),
+            this.correct("mpdwen", false, true)
+        ]);
+
+        return results;
+    };
 
     //
     // Prepare dictionary:
@@ -653,10 +652,10 @@ class magikEspellCheck extends Syllabifier {
 
         })
 
-        this.ready = true;
-        //this.dictData = null;
+        this.dictData = null;
+        (!this.warmStart) ? this.ready = true :
+            this.handleWarmStartAll().then(results => { console.log("warm up ready"); this.ready = true; });
 
-        this.handleWarmStartAll().then(results => { this.warmStart = false; });
         console.log("Dictionary fully loaded");
     }
 
@@ -882,7 +881,6 @@ class magikEspellCheck extends Syllabifier {
     //
     returnSuggestions(patterns, ogWord) {
 
-        let invf2l = ogWord[1] + ogWord[0];
         let noiseCache = this.noiseCache;
         let sugestions = [];
 
@@ -891,7 +889,6 @@ class magikEspellCheck extends Syllabifier {
 
             let [pattern, ln, sw] = _pattern;
             let set = this.getSet(pattern, ln)
-            let isSwaped = invf2l === pattern.slice(0, 2);
 
             if (!set) return;
 
@@ -929,21 +926,14 @@ class magikEspellCheck extends Syllabifier {
     // Note:warmStart
     //   - Uses a setInterval-based "waitTillReady" to keep a callback-style API (no Promises).
     //
-    correct(word, callBack = false) {
 
-        // If this is called before JIT warm up makes a promess
-        const waitUntilReady = () =>
-            new Promise(resolve => {
-                const check = () =>
-                    this.ready ? resolve(/* your code here */) : requestAnimationFrame(check);
-                check();
-            });
+    correct(word, callBack = false, silentExec = false) {
 
-        if (!callBack && !this.ready)
-            waitUntilReady().then(() => console.log("Now ready!"));
+        if (!this.ready && !callBack && !silentExec)
+            throw new Error("For no callback use, a dict must be ready first!");
 
-        // comment this if you dont want to mesure exec time
-        const start = performance.now();
+        let start = this.ready ? performance.now() : null;
+
         let rInt; // use to clear callback int
         //
         // This helper sustitutes a promise paradigm for a callback return type paradigm, wich I preffer.
@@ -956,7 +946,9 @@ class magikEspellCheck extends Syllabifier {
 
         const run = () => {
 
+            // comment this if you dont want to mesure exec time
             this.noiseCache = new Set([]);
+            start = !this.isValid(start) && this.ready ? performance.now() : start;
 
             if (this.check(word)) {
 
@@ -968,7 +960,10 @@ class magikEspellCheck extends Syllabifier {
             let mutations = this.generateMutations(word);
 
             let sugestions = this.returnSuggestions([...mutations], word);
-            this.isValid(start) && !this.warmStart ? this.printTime(start, " EXEC TIME", 10) : null;
+            this.isValid(start) && this.ready && !silentExec ? this.printTime(start, " EXEC TIME", 10) : null;
+
+            if (this.ready && this.warmStart)
+                this.warmStart = false;
 
             if (!!callBack)
                 return callBack(sugestions);
@@ -976,12 +971,14 @@ class magikEspellCheck extends Syllabifier {
             return sugestions;
         }
 
-        (!this.ready) ? waitTillReady() : null;
+        (!this.ready && !silentExec) ? waitTillReady() : null;
 
-        if (this.ready)
+        if (this.ready || silentExec)
             return run();
     }
 
 }
 
 const spell = new magikEspellCheck();
+
+spell.correct("pefro", console.log)
