@@ -32,7 +32,11 @@
 // Core utility methods
 class coreMethods {
 
-    dictData; dictMapped = new Map();
+    dictData;
+    accentedWords = [];
+    accentedWordsMirror = [];
+    accentedWordsSet = new Set([]);
+    dictMapped = new Map();
 
     //
     //  CONF ZONE
@@ -322,8 +326,10 @@ class coreMethods {
     // return the rigth version, used at the end of the pipeline
     addAccents(word) {
 
+        if (!this.accentedWordsSet.has(word))
+            return word;
 
-        return word;
+        return this.accentedWordsMirror[this.accentedWords.indexOf(word)];
     }
 
 }
@@ -604,7 +610,7 @@ class magikEspellCheck extends Syllabifier {
 
         const results = await Promise.all([
 
-            this.correct("pdms", false, true),
+            this.correct("evolucin", false, true),
             this.correct("rvluchn", false, true),
             this.correct("mpdwen", false, true),
             this.correct("aslonjs", false, true),
@@ -628,6 +634,7 @@ class magikEspellCheck extends Syllabifier {
 
         this.dictData.forEach((word) => {
 
+            let ogWord = word;
             word = this.normalize(word)
             const f2c = word.slice(0, 2).toLowerCase();
             const fw = f2c.slice(0, 1).toLowerCase();
@@ -653,9 +660,20 @@ class magikEspellCheck extends Syllabifier {
             // Storing word in set...
             this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${we}`).get(`${ln}`).add(word.toLowerCase());
 
+
+            if (!/[à-ÿ]/i.test(ogWord)) return;
+
+            // For accents handling
+            this.accentedWords.push(word)
+            this.accentedWordsMirror.push(ogWord)
+
+
         })
 
-        this.dictData = null;
+        // Used for detect acccented words and correct them
+        this.accentedWordsSet = new Set([... this.dictData.filter((w) => /[à-ÿ]/i.test(w))].map((w) => this.normalize(w)));
+
+        this.dictData = [];
         (!this.warmStart) ? this.ready = true :
             this.handleWarmStartAll().then(results => { console.log("warm up ready"); this.ready = true; });
 
@@ -916,7 +934,7 @@ class magikEspellCheck extends Syllabifier {
 
         })
         sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
-        return sugestions.map((s) => this.addAccents(s));
+        return sugestions.map((s) => [this.addAccents(s[0], s[1])]);
     }
 
     //
@@ -936,8 +954,9 @@ class magikEspellCheck extends Syllabifier {
             throw new Error("For no callback use, a dict must be ready first!");
 
         let start = this.ready ? performance.now() : null;
-
+        let ogWord = word;
         let rInt; // use to clear callback int
+
         //
         // This helper sustitutes a promise paradigm for a callback return type paradigm, wich I preffer.
         // You call correct method with the callback to exec return as 2nd argument
@@ -952,14 +971,19 @@ class magikEspellCheck extends Syllabifier {
             // comment this if you dont want to mesure exec time
             this.noiseCache = new Set([]);
             start = !this.isValid(start) && this.ready ? performance.now() : start;
+            word = this.normalize(word);
 
             if (this.check(word)) {
 
-                if (!!callBack) return callBack(true);
-                return true;
+                let r = this.addAccents(word);
+
+                if (this.addAccents(word) !== ogWord)
+                    r = [this.addAccents(word)];
+
+                if (!!callBack) r = callBack(this.addAccents(word));
+                return r;
             }
 
-            word = this.normalize(word);
             let mutations = this.generateMutations(word);
 
             let sugestions = this.returnSuggestions([...mutations], word);
