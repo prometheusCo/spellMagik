@@ -975,10 +975,9 @@ class magikEspellCheck extends Syllabifier {
 
             if (this.check(word)) {
 
-                let r = this.addAccents(word);
+                let r = [this.addAccents(word)];
 
-                if (this.addAccents(word) !== ogWord)
-                    r = [this.addAccents(word)];
+                r = (this.addAccents(word) !== ogWord) ? r : true;
 
                 if (!!callBack) r = callBack(this.addAccents(word));
                 return r;
