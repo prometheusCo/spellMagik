@@ -603,9 +603,12 @@ class magikEspellCheck extends Syllabifier {
         if (!this.warmStart) return null;
 
         const results = await Promise.all([
+
+            this.correct("pdms", false, true),
             this.correct("rvluchn", false, true),
-            this.correct("zqxter", false, true),
-            this.correct("mpdwen", false, true)
+            this.correct("mpdwen", false, true),
+            this.correct("aslonjs", false, true),
+
         ]);
 
         return results;
@@ -981,4 +984,3 @@ class magikEspellCheck extends Syllabifier {
 
 const spell = new magikEspellCheck();
 
-spell.correct("pefro", console.log)
