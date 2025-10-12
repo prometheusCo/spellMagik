@@ -36,6 +36,8 @@ class coreMethods {
 
     //
     //  CONF ZONE
+    //
+
     //  Remote dictionary (comma-separated tokens; optionally gzip-compressed)
     dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionaryC.txt";
 
@@ -47,6 +49,8 @@ class coreMethods {
 
     /* String diff tolerance for especial cases ( swaped initial letters for exam)
     =====> */  diffTolerance = 0.15;
+
+    swappedCharsDeviation = 0.07;
 
     //  Cap on suggestions returned
     maxNumSuggestions = 10;
@@ -61,6 +65,10 @@ class coreMethods {
     consonantssWildcard = "~";
 
     //
+    //  CONF ZONE
+    //
+    //
+
     // Vowels used for syllabification and others checks (Spanish-centric)
     weakVowels = ['i', 'u'];
     strongVowels = ['a', 'e', 'o']
@@ -792,13 +800,17 @@ class magikEspellCheck extends Syllabifier {
     // Reusable helper: builds candidates for each `st` and length window
 
     buildCandidates = (list, middle, end, collector) => {
+
         const n = middle.length;
-        list.forEach(st => {
-            /[§|~]/.test(st)
+        list.forEach(_st => {
+
+            let st = (typeof _st === "object") ? _st[0] : _st;
+
+            / [§| ~] /.test(st)
                 ? null
                 : [-2, -1, 0, 1].forEach(i => {
                     const expReg = `${st}[a-z]{${n + i}}${end}`;
-                    collector.push([expReg, st.length + n + i + end.length]);
+                    collector.push([expReg, st.length + n + i + end.length, (typeof _st === "object" ? true : false)]);
                 });
         });
     };
@@ -810,6 +822,7 @@ class magikEspellCheck extends Syllabifier {
     //   - middle-length ±1 tolerance
     //   - ending wildcard alignment
     //
+
     generateMutations(word) {
 
         let candidate = this.splitInSyllables(word);
@@ -837,7 +850,7 @@ class magikEspellCheck extends Syllabifier {
 
         // IT WAS MEANT TO START WITH THE FIRST 2 LETTERS  ORDER SWAPPED 
         if (this.isValidSyllable(F2C[1] + F2C[0]))
-            start.unshift(F2C[1] + F2C[0]);
+            start.unshift([F2C[1] + F2C[0], true]);
 
 
         // WORD'S START VRS IF ANY (expand wildcard to concrete vowels/consonants)
@@ -870,10 +883,10 @@ class magikEspellCheck extends Syllabifier {
         let noiseCache = this.noiseCache;
         let sugestions = [];
 
-
+        //console.log(patterns);
         patterns.some((_pattern) => {
 
-            let [pattern, ln] = _pattern;
+            let [pattern, ln, sw] = _pattern;
             let set = this.getSet(pattern, ln)
             let isSwaped = invf2l === pattern.slice(0, 2);
 
@@ -889,7 +902,7 @@ class magikEspellCheck extends Syllabifier {
                 let score = this.diffScoreStrings(ogWord, w);
 
                 // If the first two letters are swapped, reduce the difference level
-                isSwaped ? score = score + this.diffTolerance : null;
+                sw ? score = score + ((this.diffTolerance) - this.pos(ogWord.length - ln) * this.swappedCharsDeviation) : null;
 
                 if (score < this.stringDiff) return;
 
