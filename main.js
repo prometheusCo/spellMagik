@@ -931,11 +931,16 @@ class magikEspellCheck extends Syllabifier {
     //
     correct(word, callBack = false) {
 
-        // Early error  return depending on wether the dict is ready or not, and callback is false
-        if (!callBack && !this.ready) {
+        // If this is called before JIT warm up makes a promess
+        const waitUntilReady = () =>
+            new Promise(resolve => {
+                const check = () =>
+                    this.ready ? resolve(/* your code here */) : requestAnimationFrame(check);
+                check();
+            });
 
-        }
-
+        if (!callBack && !this.ready)
+            waitUntilReady().then(() => console.log("Now ready!"));
 
         // comment this if you dont want to mesure exec time
         const start = performance.now();
