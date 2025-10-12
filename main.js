@@ -595,6 +595,23 @@ class magikEspellCheck extends Syllabifier {
         this.dictionaryLoad(this.dictionaryUrl);
     }
 
+    // To proper warm up JIT given words must be incorrect,
+    // otherwise it wouldn't fully warm up
+    // Also code is writen to work based on that basis
+    handleWarmStartAll() {
+
+        return !this.warmStart
+            ? Promise.resolve(null)
+            : Promise.all([
+                this.correct("acsa", this._null),
+                this.correct("rvlucon", this._null),
+                this.correct("pkdmos", this._null),
+                this.correct("aslonfs", this._null),
+                this.correct("aslonhs", this._null)
+            ]);
+
+    }
+
     //
     // Prepare dictionary:
     //   - Split CSV-like content
@@ -602,6 +619,7 @@ class magikEspellCheck extends Syllabifier {
     //   - Build a 2-level index Map: first-letter -> first-two-letters -> Set(words)
     //   - Persist raw string for future sessions and drop large arrays from RAM
     //
+
     prepareDict() {
 
         this.dictData = this.dictData.split(",");
@@ -638,22 +656,7 @@ class magikEspellCheck extends Syllabifier {
         this.ready = true;
         //this.dictData = null;
 
-        // To proper warm up JIT given words must be incorrect,
-        // otherwise it wouldn't fully warm up
-        // Also code is writen to work based on that basis
-        const handleWarmStartAll = () =>
-
-            !this.warmStart
-                ? Promise.resolve(null)
-                : Promise.all([
-                    this.correct("acsa", this._null),
-                    this.correct("rvlucon", this._null),
-                    this.correct("pkdmos", this._null),
-                    this.correct("aslonfs", this._null),
-                    this.correct("aslonhs", this._null)
-                ]);
-
-        handleWarmStartAll().then(results => { this.warmStart = false; });
+        this.handleWarmStartAll().then(results => { this.warmStart = false; });
         console.log("Dictionary fully loaded");
     }
 
@@ -929,8 +932,9 @@ class magikEspellCheck extends Syllabifier {
     correct(word, callBack = false) {
 
         // Early error  return depending on wether the dict is ready or not, and callback is false
-        if (!callBack && !this.ready)
-            throw new Error("For using correct() without any callback, dictionary must be loaded first!");
+        if (!callBack && !this.ready) {
+
+        }
 
 
         // comment this if you dont want to mesure exec time
