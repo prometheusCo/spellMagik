@@ -630,11 +630,22 @@ class magikEspellCheck extends Syllabifier {
         this.ready = true;
         //this.dictData = null;
 
-        // To proper warm up JIT given word must be incorrect,
+        // To proper warm up JIT given words must be incorrect,
         // otherwise it wouldn't fully warm up
-        // Also code is writen to work based on the second case
-        this.warmStart ? this.correct("rvluchn", this._null) : null;
+        // Also code is writen to work based on that basis
+        const handleWarmStartAll = () =>
 
+            !this.warmStart
+                ? Promise.resolve(null)
+                : Promise.all([
+                    this.correct("acsa", this._null),
+                    this.correct("rvlucon", this._null),
+                    this.correct("pkdmos", this._null),
+                    this.correct("aslonfs", this._null),
+                    this.correct("aslonhs", this._null)
+                ]);
+
+        handleWarmStartAll().then(results => { this.warmStart = false; });
         console.log("Dictionary fully loaded");
     }
 
@@ -884,14 +895,6 @@ class magikEspellCheck extends Syllabifier {
 
             })
 
-            //Code bellow changes flow to perform faster in swaped letters cases
-            if (isSwaped) {
-
-                sugestions = sugestions.sort((a, b) => b[1] - a[1]);
-                if (sugestions.length >= this.maxNumSuggestions)
-                    return true;
-            }
-
         })
         sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
         return sugestions.map((s) => this.addAccents(s));
@@ -941,8 +944,6 @@ class magikEspellCheck extends Syllabifier {
 
             let sugestions = this.returnSuggestions([...mutations], word);
             this.isValid(start) && !this.warmStart ? this.printTime(start, " EXEC TIME", 10) : null;
-
-            this.warmStart ? this.warmStart = false : null;
 
             if (!!callBack)
                 return callBack(sugestions);
