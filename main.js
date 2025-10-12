@@ -829,10 +829,10 @@ class magikEspellCheck extends Syllabifier {
 
             let st = (typeof _st === "object") ? _st[0] : _st;
 
-            / [§| ~] /.test(st)
+            /[§|~]/.test(st)
                 ? null
                 : [-2, -1, 0, 1].forEach(i => {
-                    const expReg = `${st}[a-z]{${n + i}}${end}`;
+                    const expReg = `${st}[a-zñ]{${n + i}}${end}`;
                     collector.push([expReg, st.length + n + i + end.length, (typeof _st === "object" ? true : false)]);
                 });
         });
