@@ -68,7 +68,7 @@ spell.correct(word, callback)
 * Always waits until the dictionary is ready.
 * If the word is **valid**, it:
 
-  * returns true, **and**
+  * returns 'same word', **and**
   * calls the callback with the result.
 
 * If it's not valid
