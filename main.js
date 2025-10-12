@@ -788,6 +788,22 @@ class magikEspellCheck extends Syllabifier {
     }
 
     //
+    //
+    // Reusable helper: builds candidates for each `st` and length window
+
+    buildCandidates = (list, middle, end, collector) => {
+        const n = middle.length;
+        list.forEach(st => {
+            /[§|~]/.test(st)
+                ? null
+                : [-2, -1, 0, 1].forEach(i => {
+                    const expReg = `${st}[a-z]{${n + i}}${end}`;
+                    collector.push([expReg, st.length + n + i + end.length]);
+                });
+        });
+    };
+
+    //
     // Generate length-/pattern-constrained regexes to probe dictionary buckets.
     // Uses:
     //   - onset alternatives (swap letters, fill wildcard with concrete vowels/consonants)
@@ -834,22 +850,9 @@ class magikEspellCheck extends Syllabifier {
         // PATTER MIDDLE: remove first two chars and terminal suffix to isolate the middle-run length
         middle = middle.slice(2, -(end.length))
 
-
         // GENERATING FINAL MUTATIONS TO TEST AGAINST CLUSTER
-        start.forEach((st) => {
+        start.forEach(st => this.buildCandidates([st], middle, end, finalCandidates));
 
-            let n = middle.length;
-            for (let index = -2; index < 2; index++) {
-
-                // NOTE: [a-z] here is ASCII-limited by design, because dictionary tokens are normalized ASCII.
-                // If dictionary becomes fully Unicode-normalized, this can be widened accordingly.
-                let expReg = `${st}[a-z]{${(n + index)}}${end}`;
-                if (/[§|~]/.test(st))
-                    continue;
-
-                finalCandidates.push([expReg, (st.length + (n + index)) + end.length]);
-            }
-        })
         return finalCandidates;
     }
 
