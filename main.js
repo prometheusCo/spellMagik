@@ -827,25 +827,6 @@ class magikEspellCheck extends Syllabifier {
         return syllables;
     }
 
-    //
-    //
-    // Reusable helper: builds candidates for each `st` and length window
-
-    buildCandidates = (list, middle, end, collector) => {
-
-        const n = middle.length;
-        list.forEach(_st => {
-
-            let st = (typeof _st === "object") ? _st[0] : _st;
-
-            /[§|~]/.test(st)
-                ? null
-                : [-2, -1, 0, 1].forEach(i => {
-                    const expReg = `${st}[a-zñ]{${n + i}}${end}`;
-                    collector.push([expReg, st.length + n + i + end.length, (typeof _st === "object" ? true : false)]);
-                });
-        });
-    };
 
     //
     // Generate length-/pattern-constrained regexes to probe dictionary buckets.
@@ -896,7 +877,56 @@ class magikEspellCheck extends Syllabifier {
         middle = middle.slice(2, -(end.length))
 
         // GENERATING FINAL MUTATIONS TO TEST AGAINST CLUSTER
-        start.forEach(st => this.buildCandidates([st], middle, end, finalCandidates));
+        const n = middle.length;
+        [...start].forEach((_st) => {
+
+            let st = typeof _st === "object" ? _st[0] : _st;
+            let n = middle.length;
+
+            for (let index = -2; index < 2; index++) {
+
+                // NOTE: [a-z] here is ASCII-limited by design, because dictionary tokens are normalized ASCII.
+                let expReg = `${st}[a-z]{${(n + index)}}${end}`;
+                let lengthTotal = st.length + (n + index);
+
+                if (/[§|~]/.test(st) || (n + index) <= 0)
+                    continue;
+
+                finalCandidates.push([expReg, (lengthTotal) + end.length, (typeof _st === "object" ? true : false)]);
+            }
+        })
+
+        //
+        // EXPANDING ENDINGS
+        let endingVrs = [];
+
+        // WORD SHOULD HAVE BEEN ENDED IN VOWEL BUT IT ENDS IN CONSONANTS
+        if (this.isValidSyllable(end + this.vowelsWildcard))
+            endingVrs.push((end + this.vowelsWildcard));
+
+        // GENERATING FINAL MUTATIONS TO TEST AGAINST CLUSTER CHANGING ENDINGS INSTEAD
+        [...finalCandidates].forEach((_candidate) => {
+
+            endingVrs.forEach((ending) => {
+
+                let [candidate, length, swapped] = _candidate;
+                length = length - 1 + ending.length;
+                let newCand = [candidate.slice(0, -1) + ending, length, swapped];
+
+                if (!/[§|~]/.test(newCand[0])) {
+                    finalCandidates.push(newCand); return;
+                }
+
+                vowels.forEach((l) => {
+                    if (l === this.vowelsWildcard)
+                        return;
+                    let newV = [candidate.slice(0, -1) + ending.replace(this.vowelsWildcard, l), length, swapped];
+                    finalCandidates.push(newV);
+                })
+
+
+            })
+        });
 
         return finalCandidates;
     }
@@ -914,7 +944,6 @@ class magikEspellCheck extends Syllabifier {
         let foundCache = this.foundCache;
         let sugestions = [];
 
-        //console.log(patterns);
         patterns.some((_pattern) => {
 
             let [pattern, ln, sw] = _pattern;
@@ -942,8 +971,8 @@ class magikEspellCheck extends Syllabifier {
             })
 
         })
-        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
-        return sugestions.map((s) => [this.addAccents(s[0], s[1])]);
+        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, 20);
+        return sugestions.map((s) => [this.addAccents(s[0]), s[1]]);
     }
 
     //
