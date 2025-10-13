@@ -54,6 +54,8 @@ class coreMethods {
     warmStart = true;
 
 
+    stringDiff = 70
+
     //  Wildcard tokens used INSIDE candidate patterns:
     //  vowelsWildcard => matches any vowel; consonantssWildcard => any consonant
     vowelsWildcard = "§";
@@ -258,48 +260,26 @@ class coreMethods {
         return r;
     }
 
-    //
-    //
-    diffScoreStringsFast(str1, str2) {
+    // Adhoc method — same logic, faster: precompute sets and freqs, no regex, no joins
+    diffScoreStringsFast = (str1, str2) => {
 
-        str1 = str1.split(""); str2 = str2.split("");
-        let loopOrder = [str1, str2];
-        let diff = [];
-        let tl = str1.length + str2.length;
-        let done = new Set([]);
-
-        loopOrder.forEach((self, loopIndex) => {
-
-            self.forEach((selfChar) => {
-
-                let other = loopOrder[loopIndex + 1] ?? loopOrder[loopIndex - 1];
-
-                if (done.has(selfChar)) return;
-
-                if (!other.includes(selfChar)) {
-                    diff.push(selfChar); return;
-                }
-
-                let regExp = new RegExp(`${selfChar}`, "g");
-                let ocurrenciesSelf = self.join("").matchAll(regExp).toArray().length;
-                let ocurrenciesOther = other.join("").matchAll(regExp).toArray().length;
-
-                if (ocurrenciesOther === ocurrenciesSelf)
-                    return;
-
-                let _diff = this.pos(ocurrenciesSelf - ocurrenciesOther);
-
-                for (let index = 0; index < _diff; index++) {
-                    diff.push(selfChar);
-                }
-                done.add(selfChar);
-
-            })
-        })
-
-        return ((tl - diff.length) / tl) * 100;
-
+        let a = [...str1], b = [...str2], tl = a.length + b.length, diff = 0
+        let loop = [a, b], done = new Set(), sets = [new Set(a), new Set(b)]
+        let freq = [Object.create(null), Object.create(null)]
+        for (let ch of a) freq[0][ch] = (freq[0][ch] || 0) + 1
+        for (let ch of b) freq[1][ch] = (freq[1][ch] || 0) + 1
+        loop.forEach((self, i) => self.forEach((ch) => {
+            let j = i ^ 1
+            if (done.has(ch)) return
+            if (!sets[j].has(ch)) { diff += 1; return }
+            let d = Math.abs((freq[i][ch] || 0) - (freq[j][ch] || 0))
+            if (!d) return
+            diff += d
+            done.add(ch)
+        }))
+        return ((tl - diff) / tl) * 100
     }
+
 
 
     //
@@ -821,6 +801,7 @@ class magikEspellCheck extends Syllabifier {
 
     generateMutations(word) {
 
+        let ogPatern = this.splitInSyllables(word);
         let candidate = this.splitInSyllables(word);
         let F2C = candidate.join("").slice(0, 2);
         let finalCandidates = [];
@@ -891,9 +872,9 @@ class magikEspellCheck extends Syllabifier {
 
             endingVrs.forEach((ending) => {
 
-                let [candidate, length, swapped] = _candidate;
+                let [candidate, length] = _candidate;
                 length = length - 1 + ending.length;
-                let newCand = [candidate.slice(0, -1) + ending, length, swapped];
+                let newCand = [candidate.slice(0, -1) + ending, length];
 
                 if (!/[§|~]/.test(newCand[0])) {
                     finalCandidates.push(newCand); return;
@@ -902,7 +883,7 @@ class magikEspellCheck extends Syllabifier {
                 vowels.forEach((l) => {
                     if (l === this.vowelsWildcard)
                         return;
-                    let newV = [candidate.slice(0, -1) + ending.replace(this.vowelsWildcard, l), length, true];
+                    let newV = [candidate.slice(0, -1) + ending.replace(this.vowelsWildcard, l), length];
                     finalCandidates.push(newV);
                 })
 
@@ -923,32 +904,34 @@ class magikEspellCheck extends Syllabifier {
     //
     returnSuggestions(patterns, ogWord) {
 
-        ogWord = this.splitInSyllables(ogWord).join("");
         let foundCache = this.foundCache;
         let sugestions = [];
 
+        console.log(patterns)
         patterns.some((_pattern) => {
 
             let [pattern, ln] = _pattern;
             let set = this.getSet(pattern, ln);
+            let skiped = 0;
 
             if (!set) return;
 
             let reg = new RegExp(pattern, "i")
-            let pool = [...set];
+            let pool = [...set]
 
             pool.some((w) => {
 
-                if (ln !== w.length || foundCache.has(w) || !reg.test(w)) return;
+                if (foundCache.has(w) || !reg.test(w)) return;
 
                 let score = this.diffScoreStringsFast(ogWord, w);
-                if (score < this.stringDiff) return;
+                if (score < this.stringDiff) { skiped++; return; }
+
+                if (skiped === 10) return true;
 
                 foundCache.add(w);
                 sugestions.push([w, score]);
 
             })
-
 
         })
         sugestions = sugestions.sort((a, b) => b[1] - a[1]);
