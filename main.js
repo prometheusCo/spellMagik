@@ -649,8 +649,7 @@ class magikEspellCheck extends Syllabifier {
         const results = await Promise.all([
 
             this.correct("evolucin", false, true),
-            this.correct("rvluchn", false, true),
-            this.correct("aslonjs", false, true),
+            this.correct("revluchn", false, true),
 
         ]);
 
@@ -1023,7 +1022,7 @@ class magikEspellCheck extends Syllabifier {
         let rInt; // use to clear callback int
 
         //
-        // This helper sustitutes a promise paradigm for a callback return  paradigm, wich I preffer.
+        // This helper sustitutes a promise paradigm for a callback paradigm, wich I preffer.
         //
         const waitTillReady = () => {
             rInt = setInterval(() => { this.ready ? clearInterval(rInt) & run() : null }, 500)
