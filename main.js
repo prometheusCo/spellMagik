@@ -271,7 +271,7 @@ class coreMethods {
 
     // Weighted Levenshtein-like similarity with vowel/consonant wildcards.
     // Returns a score in ~[0.1, 0.99]; higher means more similar.
-    diffScoreStrings = (a, b, weights = { ins: 0.7, del: 0.5, sub: 1.5 }) => {
+    diffScoreStrings(a, b, weights = { ins: 0.7, del: 0.5, sub: 1.5 }) {
 
         const vowels = 'aeiouAEIOU';
         const isVowel = c => vowels.includes(c);
@@ -610,6 +610,35 @@ class magikEspellCheck extends Syllabifier {
         super();
         this.dictionaryLoad(this.dictionaryUrl);
     }
+
+    // Returns true if a char is adyacent to another in a qwerty keyboard
+    adjacentQwerty = (a, b) => {
+        a = (a || '').toLowerCase(); b = (b || '').toLowerCase();
+        let rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"], ra = -1, rb = -1, ca = 0, cb = 0, i = 0, ia = 0, ib = 0;
+        for (; i < 3; i++) ia = rows[i].indexOf(a), ib = rows[i].indexOf(b), ra = ra < 0 && ia > -1 ? i : ra, ca = ia > -1 ? ia : ca, rb = rb < 0 && ib > -1 ? i : rb, cb = ib > -1 ? ib : cb;
+        return a && b && a !== b && ra > -1 && rb > -1 ? Math.abs(ra - rb) <= 1 && Math.abs(ca - cb) <= 1 : false;
+    }
+
+
+    //Core methods expansion of diffScoreStrings()
+    diffScoreStrings(original, sustitution) {
+
+        let raw = super.diffScoreStrings(original, sustitution);
+
+        if (raw >= 0.80 || raw < this.stringDiff) return raw;
+
+        original = original.split("");
+        sustitution = sustitution.split("");
+
+        let diffChars = new Set(sustitution.filter((a, i) => !original.indexOf(a) >= 0 && this.pos(original.indexOf(a) - i) >= 3));
+
+        // penalizing strings that are to different from one to another
+        return raw - diffChars.size * (0.09);
+
+
+    }
+
+
 
     // To proper warm up JIT given words must be incorrect,
     // otherwise it wouldn't fully warm up
@@ -970,7 +999,7 @@ class magikEspellCheck extends Syllabifier {
             })
 
         })
-        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, 30);
+        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, 20);
         return sugestions.map((s) => [this.addAccents(s[0]), s[1]]);
     }
 
