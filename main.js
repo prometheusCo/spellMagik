@@ -33,8 +33,7 @@
 class coreMethods {
 
     dictData;
-    accentedWords = [];
-    accentedWordsMirror = [];
+    accentedWords = new Map()
     accentedWordsSet = new Set([]);
     dictMapped = new Map();
 
@@ -329,7 +328,7 @@ class coreMethods {
         if (!this.accentedWordsSet.has(word))
             return word;
 
-        return this.accentedWordsMirror[this.accentedWords.indexOf(word)];
+        return this.accentedWords.get(`${word}`)
     }
 
 }
@@ -665,8 +664,7 @@ class magikEspellCheck extends Syllabifier {
             if (!/[à-ÿ]/i.test(ogWord)) return;
 
             // For accents handling
-            this.accentedWords.push(word)
-            this.accentedWordsMirror.push(ogWord)
+            this.accentedWords.set(`${word}`, ogWord)
 
 
         })
