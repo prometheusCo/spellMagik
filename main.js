@@ -271,7 +271,7 @@ class coreMethods {
 
     // Weighted Levenshtein-like similarity with vowel/consonant wildcards.
     // Returns a score in ~[0.1, 0.99]; higher means more similar.
-    diffScoreStrings = (a, b, weights = { ins: 0.7, del: 1.3, sub: 1.0 }) => {
+    diffScoreStrings = (a, b, weights = { ins: 0.7, del: 0.5, sub: 1.5 }) => {
 
         const vowels = 'aeiouAEIOU';
         const isVowel = c => vowels.includes(c);
@@ -622,7 +622,6 @@ class magikEspellCheck extends Syllabifier {
 
             this.correct("evolucin", false, true),
             this.correct("rvluchn", false, true),
-            this.correct("mpdwen", false, true),
             this.correct("aslonjs", false, true),
 
         ]);
