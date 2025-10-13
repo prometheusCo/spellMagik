@@ -999,7 +999,7 @@ class magikEspellCheck extends Syllabifier {
             })
 
         })
-        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, 20);
+        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
         return sugestions.map((s) => [this.addAccents(s[0]), s[1]]);
     }
 
