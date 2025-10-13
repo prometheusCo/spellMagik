@@ -69,7 +69,7 @@ class coreMethods {
     consonantssWildcard = "~";
 
     //
-    //  CONF ZONE
+    //  CONF ZONE END
     //
     //
 
@@ -120,7 +120,7 @@ class coreMethods {
     suspiciousStarts = new Set(["w", "k"]);
 
     // Cache to avoid duplicate candidates during suggestion expansion
-    noiseCache = new Set([]);
+    foundCache;
 
     // Invalid syllabes false positives
     invalidSyllablesFalseP = new Set(["au"])
@@ -376,6 +376,7 @@ class coreMethodsExt extends coreMethods {
         if (returnType !== "array") return r.join("");
         return r;
     }
+
     //
     // Validate first two letters (onset) against allowed clusters and exceptions.
     // Rejects early for disallowed starts (e.g., "st", "rv") and special-case digraphs.
@@ -898,11 +899,11 @@ class magikEspellCheck extends Syllabifier {
     //   - exact length for each regex (precomputed `ln`)
     //   - regex match
     //   - similarity >= stringDiff
-    // Deduplicates with noiseCache, sorts by score desc, trims to maxNumSuggestions.
+    // Deduplicates with foundCache, sorts by score desc, trims to maxNumSuggestions.
     //
     returnSuggestions(patterns, ogWord) {
 
-        let noiseCache = this.noiseCache;
+        let foundCache = this.foundCache;
         let sugestions = [];
 
         //console.log(patterns);
@@ -918,7 +919,7 @@ class magikEspellCheck extends Syllabifier {
 
             pool.forEach((w) => {
 
-                if (ln !== w.length || noiseCache.has(w) || !reg.test(w)) return;
+                if (ln !== w.length || foundCache.has(w) || !reg.test(w)) return;
 
                 let score = this.diffScoreStrings(ogWord, w);
 
@@ -927,7 +928,7 @@ class magikEspellCheck extends Syllabifier {
 
                 if (score < this.stringDiff) return;
 
-                noiseCache.add(w);
+                foundCache.add(w);
                 sugestions.push([w, score]);
 
             })
@@ -958,27 +959,30 @@ class magikEspellCheck extends Syllabifier {
         let rInt; // use to clear callback int
 
         //
-        // This helper sustitutes a promise paradigm for a callback return type paradigm, wich I preffer.
-        // You call correct method with the callback to exec return as 2nd argument
-        //  If  you don't like it you can swith to a promise paradigm type
+        // This helper sustitutes a promise paradigm for a callback return  paradigm, wich I preffer.
         //
         const waitTillReady = () => {
             rInt = setInterval(() => { this.ready ? clearInterval(rInt) & run() : null }, 500)
         }
 
+        // Main method code
         const run = () => {
 
-            // comment this if you dont want to mesure exec time
-            this.noiseCache = new Set([]);
+            this.foundCache = new Set([]);
             start = !this.isValid(start) && this.ready ? performance.now() : start;
             word = this.normalize(word).toLowerCase();
 
+            // Corret() flow when a rigth spelled word is processed
+            //  
             if (this.check(word)) {
 
                 let r = [this.addAccents(word)];
 
+                // If word is 100% ok we return true, if only lacks accents
+                // we return accented version as unique suggestion
                 r = (this.addAccents(word) !== ogWord) ? r : true;
 
+                // Returning either throught callback or direct return formula
                 if (!!callBack) r = callBack(this.addAccents(word));
                 return r;
             }
@@ -997,6 +1001,8 @@ class magikEspellCheck extends Syllabifier {
             return sugestions;
         }
 
+        // THis and lines bellow could have been done in one if/else, but I prefer this style
+        // (I found it cleaner)
         (!this.ready && !silentExec) ? waitTillReady() : null;
 
         if (this.ready || silentExec)
