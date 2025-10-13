@@ -980,7 +980,7 @@ class magikEspellCheck extends Syllabifier {
             start = !this.isValid(start) && this.ready ? performance.now() : start;
             word = this.normalize(word).toLowerCase();
 
-            // Corret() flow when a rigth spelled word is processed
+            // Returns true if correct (including accent), otherwise an array of suggestions.
             //  
             if (this.check(word)) {
 
@@ -991,7 +991,7 @@ class magikEspellCheck extends Syllabifier {
                 r = (this.addAccents(word) !== ogWord) ? r : true;
 
                 // Returning either throught callback or direct return formula
-                if (!!callBack) r = callBack(this.addAccents(word));
+                if (!!callBack) r = callBack(r);
                 return r;
             }
 
