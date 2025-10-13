@@ -52,9 +52,9 @@ class coreMethods {
     /* String diff tolerance for especial cases ( swaped initial letters for exam)
     =====> */  diffTolerance = 0.15;
 
-    // Score penalty factor when first two chars are swapped
+    // Score penalty factor for privileged strs
     // Use to adjudicate higher score to those cases with length closest to ogWord
-    swappedCharsDeviation = 0.07;
+    privilegedCharsDeviation = 0.07;
 
     //  Cap on suggestions returned
     maxNumSuggestions = 10;
@@ -920,7 +920,7 @@ class magikEspellCheck extends Syllabifier {
                 vowels.forEach((l) => {
                     if (l === this.vowelsWildcard)
                         return;
-                    let newV = [candidate.slice(0, -1) + ending.replace(this.vowelsWildcard, l), length, swapped];
+                    let newV = [candidate.slice(0, -1) + ending.replace(this.vowelsWildcard, l), length, true];
                     finalCandidates.push(newV);
                 })
 
@@ -960,8 +960,8 @@ class magikEspellCheck extends Syllabifier {
 
                 let score = this.diffScoreStrings(ogWord, w);
 
-                // If the first two letters are swapped, reduce the difference level
-                sw ? score = score + ((this.diffTolerance) - this.pos(ogWord.length - ln) * this.swappedCharsDeviation) : null;
+                // If this pattern is privileged, reduce the difference level
+                sw ? score = score + ((this.diffTolerance) - this.pos(ogWord.length - ln) * this.privilegedCharsDeviation) : null;
 
                 if (score < this.stringDiff) return;
 
@@ -971,7 +971,7 @@ class magikEspellCheck extends Syllabifier {
             })
 
         })
-        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, 20);
+        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, 30);
         return sugestions.map((s) => [this.addAccents(s[0]), s[1]]);
     }
 
