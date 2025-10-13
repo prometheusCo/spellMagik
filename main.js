@@ -46,15 +46,6 @@ class coreMethods {
     //  Max refinement passes when spliting in syllables
     epochs = 3;
 
-    //  Minimum similarity to accept suggestion (0–1). Higher => stricter
-    stringDiff = 0.7;
-
-    /* String diff tolerance for especial cases ( swaped initial letters for exam)
-    =====> */  diffTolerance = 0.15;
-
-    // Score penalty factor for privileged strs
-    // Use to adjudicate higher score to those cases with length closest to ogWord
-    privilegedCharsDeviation = 0.07;
 
     //  Cap on suggestions returned
     maxNumSuggestions = 10;
@@ -266,54 +257,49 @@ class coreMethods {
 
         return r;
     }
+
     //
     //
+    diffScoreStringsFast(str1, str2) {
 
-    // Weighted Levenshtein-like similarity with vowel/consonant wildcards.
-    // Returns a score in ~[0.1, 0.99]; higher means more similar.
-    diffScoreStrings(a, b, weights = { ins: 0.7, del: 0.5, sub: 1.5 }) {
+        str1 = str1.split(""); str2 = str2.split("");
+        let loopOrder = [str1, str2];
+        let diff = [];
+        let tl = str1.length + str2.length;
+        let done = new Set([]);
 
-        const vowels = 'aeiouAEIOU';
-        const isVowel = c => vowels.includes(c);
-        const isConsonant = c => /^[b-df-hj-np-tv-z]$/i.test(c);
-        const eq = (x, y) => (
-            x === y ? true :
-                (x === this.vowelsWildcard && isVowel(y)) || (y === this.vowelsWildcard && isVowel(x)) ? true :
-                    (x === this.consonantssWildcard && isConsonant(y)) || (y === this.consonantssWildcard && isConsonant(x))
-        );
+        loopOrder.forEach((self, loopIndex) => {
 
-        const m = a.length;
-        const n = b.length;
-        const [s, t] = m < n ? [a, b] : [b, a];
-        const rows = s.length + 1;
-        const cols = t.length + 1;
+            self.forEach((selfChar) => {
 
-        let prev = new Float32Array(cols);
-        let curr = new Float32Array(cols);
+                let other = loopOrder[loopIndex + 1] ?? loopOrder[loopIndex - 1];
 
-        for (let j = 0; j < cols; j++) prev[j] = j * weights.ins;
+                if (done.has(selfChar)) return;
 
-        for (let i = 1; i < rows; i++) {
-            curr[0] = i * weights.del;
-            const si = s[i - 1];
-            for (let j = 1; j < cols; j++) {
-                const tj = t[j - 1];
-                const cost = eq(si, tj) ? 0 : weights.sub;
-                const del = prev[j] + weights.del;
-                const ins = curr[j - 1] + weights.ins;
-                const sub = prev[j - 1] + cost;
-                curr[j] = Math.min(del, ins, sub);
-            }
-            [prev, curr] = [curr, prev];
-        }
+                if (!other.includes(selfChar)) {
+                    diff.push(selfChar); return;
+                }
 
-        const distance = prev[cols - 1];
-        const maxLen = Math.max(m, n) || 1;
-        const worst = maxLen * Math.max(weights.ins, weights.del, weights.sub);
-        const similarity = 1 - distance / worst;
+                let regExp = new RegExp(`${selfChar}`, "g");
+                let ocurrenciesSelf = self.join("").matchAll(regExp).toArray().length;
+                let ocurrenciesOther = other.join("").matchAll(regExp).toArray().length;
 
-        return 0.1 + similarity * 0.89; // scaled 0.1–0.99
-    };
+                if (ocurrenciesOther === ocurrenciesSelf)
+                    return;
+
+                let _diff = this.pos(ocurrenciesSelf - ocurrenciesOther);
+
+                for (let index = 0; index < _diff; index++) {
+                    diff.push(selfChar);
+                }
+                done.add(selfChar);
+
+            })
+        })
+
+        return ((tl - diff.length) / tl) * 100;
+
+    }
 
 
     //
@@ -611,34 +597,6 @@ class magikEspellCheck extends Syllabifier {
         this.dictionaryLoad(this.dictionaryUrl);
     }
 
-    // Returns true if a char is adyacent to another in a qwerty keyboard
-    adjacentQwerty = (a, b) => {
-        a = (a || '').toLowerCase(); b = (b || '').toLowerCase();
-        let rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"], ra = -1, rb = -1, ca = 0, cb = 0, i = 0, ia = 0, ib = 0;
-        for (; i < 3; i++) ia = rows[i].indexOf(a), ib = rows[i].indexOf(b), ra = ra < 0 && ia > -1 ? i : ra, ca = ia > -1 ? ia : ca, rb = rb < 0 && ib > -1 ? i : rb, cb = ib > -1 ? ib : cb;
-        return a && b && a !== b && ra > -1 && rb > -1 ? Math.abs(ra - rb) <= 1 && Math.abs(ca - cb) <= 1 : false;
-    }
-
-
-    //Core methods expansion of diffScoreStrings()
-    diffScoreStrings(original, sustitution) {
-
-        let raw = super.diffScoreStrings(original, sustitution);
-
-        if (raw >= 0.80 || raw < this.stringDiff) return raw;
-
-        original = original.split("");
-        sustitution = sustitution.split("");
-
-        let diffChars = new Set(sustitution.filter((a, i) => !original.indexOf(a) >= 0 && this.pos(original.indexOf(a) - i) >= 3));
-
-        // penalizing strings that are to different from one to another
-        return raw - diffChars.size * (0.09);
-
-
-    }
-
-
 
     // To proper warm up JIT given words must be incorrect,
     // otherwise it wouldn't fully warm up
@@ -650,9 +608,6 @@ class magikEspellCheck extends Syllabifier {
         const results = await Promise.all([
 
             this.correct("evolucin", false, true),
-            this.correct("rvluchn", false, true),
-            this.correct("aslonjs", false, true),
-
         ]);
 
         return results;
@@ -891,7 +846,7 @@ class magikEspellCheck extends Syllabifier {
 
         // IT WAS MEANT TO START WITH THE FIRST 2 LETTERS  ORDER SWAPPED 
         if (this.isValidSyllable(F2C[1] + F2C[0]))
-            start.unshift([F2C[1] + F2C[0], true]);
+            start.unshift(F2C[1] + F2C[0]);
 
 
         // WORD'S START VRS IF ANY (expand wildcard to concrete vowels/consonants)
@@ -906,11 +861,10 @@ class magikEspellCheck extends Syllabifier {
 
         // GENERATING FINAL MUTATIONS TO TEST AGAINST CLUSTER
         const n = middle.length;
-        [...start].forEach((_st) => {
 
-            let st = typeof _st === "object" ? _st[0] : _st;
+        [...start].forEach((st) => {
+
             let n = middle.length;
-
             for (let index = -2; index < 2; index++) {
 
                 // NOTE: [a-z] here is ASCII-limited by design, because dictionary tokens are normalized ASCII.
@@ -920,7 +874,7 @@ class magikEspellCheck extends Syllabifier {
                 if (/[§|~]/.test(st) || (n + index) <= 0)
                     continue;
 
-                finalCandidates.push([expReg, (lengthTotal) + end.length, (typeof _st === "object" ? true : false)]);
+                finalCandidates.push([expReg, (lengthTotal) + end.length]);
             }
         })
 
@@ -969,28 +923,25 @@ class magikEspellCheck extends Syllabifier {
     //
     returnSuggestions(patterns, ogWord) {
 
+        ogWord = this.splitInSyllables(ogWord).join("");
         let foundCache = this.foundCache;
         let sugestions = [];
 
         patterns.some((_pattern) => {
 
-            let [pattern, ln, sw] = _pattern;
-            let set = this.getSet(pattern, ln)
+            let [pattern, ln] = _pattern;
+            let set = this.getSet(pattern, ln);
 
             if (!set) return;
 
             let reg = new RegExp(pattern, "i")
             let pool = [...set];
 
-            pool.forEach((w) => {
+            pool.some((w) => {
 
                 if (ln !== w.length || foundCache.has(w) || !reg.test(w)) return;
 
-                let score = this.diffScoreStrings(ogWord, w);
-
-                // If this pattern is privileged, reduce the difference level
-                sw ? score = score + ((this.diffTolerance) - this.pos(ogWord.length - ln) * this.privilegedCharsDeviation) : null;
-
+                let score = this.diffScoreStringsFast(ogWord, w);
                 if (score < this.stringDiff) return;
 
                 foundCache.add(w);
@@ -998,8 +949,9 @@ class magikEspellCheck extends Syllabifier {
 
             })
 
+
         })
-        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
+        sugestions = sugestions.sort((a, b) => b[1] - a[1]);
         return sugestions.map((s) => [this.addAccents(s[0]), s[1]]);
     }
 
