@@ -161,7 +161,7 @@ class coreMethods {
     isInverted = (a, b) => a.split("").reverse().join("") == b
 
     //
-    normalize = s => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, (m, i, a) => (m === '\u0303' && /[nN]/.test(a[i - 1])) ? m : '').normalize('NFC') : s;
+    normalize = s => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, (m, i, a) => (m === '\u0303' && /[nN]/.test(a[i - 1])) ? m : '').normalize('NFC').toLowerCase() : s;
 
     // Silent exec
     _null = a => a;
@@ -671,37 +671,54 @@ class magikEspellCheck extends Syllabifier {
 
         this.dictData.forEach((word) => {
 
-            let ogWord = word;
-            word = this.normalize(word)
+            let ogWord = word.toLowerCase();
+            word = this.normalize(word);
+
+            const fc = word.slice(0, 1).toLowerCase();
             const f2c = word.slice(0, 2).toLowerCase();
-            const fw = f2c.slice(0, 1).toLowerCase();
-            const we = word[word.length - 1];
+            const f3c = word.slice(0, 3).toLowerCase();
             const ln = word.length;
 
+            // For accents handling
+            /[à-ÿ]/i.test(ogWord) ? this.accentedWords.set(`${word}`, ogWord) : null;
+
+
             // If first level (a, b ,c ... [first letter]) is undef for this word, we make it
-            if (!this.dictMapped.has(`${fw}`))
-                this.dictMapped.set(`${fw}`, new Map());
+            if (!this.dictMapped.has(`${fc}`))
+                this.dictMapped.set(`${fc}`, new Map());
 
             // If second level is also undef we made it
-            if (!this.dictMapped.get(`${fw}`).has(`${f2c}`))
-                this.dictMapped.get(`${fw}`).set(`${f2c}`, new Map())
+            if (!this.dictMapped.get(`${fc}`).has(`${f2c}`))
+                this.dictMapped.get(`${fc}`).set(`${f2c}`, [[], new Set(), new Map()])
 
             // If third level...
-            if (!this.dictMapped.get(`${fw}`).get(`${f2c}`).has(`${we}`))
-                this.dictMapped.get(`${fw}`).get(`${f2c}`).set(`${we}`, new Map())
+            if (!this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].has(`${f3c}`))
+                this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].set(`${f3c}`, [[], new Set(), new Map()]);
 
-            // If 4th level..
-            if (!this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${we}`).has(`${ln}`))
-                this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${we}`).set(`${ln}`, new Set())
-
-            // Storing word in set...
-            this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${we}`).get(`${ln}`).add(word.toLowerCase());
+            // If 4th level...
+            if (!this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${ln}`))
+                this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].set(`${ln}`, [[], new Set()]);
 
 
-            if (!/[à-ÿ]/i.test(ogWord)) return;
+            //Storing word in levels acording word's deep
+            //
+            // Storing word in second level by default
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[0].push(word);
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[1].add(word);
 
-            // For accents handling
-            this.accentedWords.set(`${word}`, ogWord)
+
+            //If there's no third level we skiped the rest...
+            if (f3c.length < 3)
+                return;
+
+            // Storing word in third level 
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[0].push(word);
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[1].add(word);
+
+
+            // Storing word in 4th level 
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${ln}`)[0].push(word);
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${ln}`)[1].add(word);
 
 
         })
@@ -722,18 +739,24 @@ class magikEspellCheck extends Syllabifier {
     //
     getSet(word, len = false) {
 
+        const fc = word.slice(0, 1);
         const f2c = word.slice(0, 2);
-        const fc = f2c.slice(0, 1);
-        const we = word[word.length - 1];
-        const ln = !len ? word.length : len;
+        const f3c = word.slice(0, 3);
+        const lnl = !len ? word.length : len;
 
-        try {
-            return this.dictMapped.get(`${fc}`).get(`${f2c}`).get(`${we}`).get(`${ln}`);
-
-        } catch (error) {
+        if (!this.dictMapped.get(`${fc}`) || !this.dictMapped.get(`${fc}`).get(`${f2c}`))
             return false;
-        }
 
+        let secondLevel = this.dictMapped.get(`${fc}`).get(`${f2c}`);
+        let thirdLevel = secondLevel[2].get(`${f3c}`);
+
+        if (f3c.length < 3 || !thirdLevel)
+            return secondLevel;
+
+        if (!thirdLevel[2].get(`${lnl}`))
+            return thirdLevel;
+
+        return thirdLevel[2].get(`${lnl}`);
     }
 
 
@@ -765,7 +788,7 @@ class magikEspellCheck extends Syllabifier {
         }
 
         let set = this.getSet(word);
-        if (!set || !set.has(word))
+        if (!set || !set[1].has(word))
             return false;
 
         return true;
@@ -979,7 +1002,7 @@ class magikEspellCheck extends Syllabifier {
             if (!set) return;
 
             let reg = new RegExp(pattern, "i")
-            let pool = [...set];
+            let pool = set[0];
 
             pool.forEach((w) => {
 
