@@ -83,7 +83,7 @@ No Promises — pure callback flow.
 
 ## ⚡ Performance
 
-* 2-level dictionary index (`a → ab → Set(words)`) for fast lookups.
+* 4 - level three LIKE dictionary index (`a → ab → abu → (abue..a) → [[words], Set(words)] `) for fast lookups.
 * Typed arrays for fast edit-distance computation.
 * First call “warm-start” compiles hot paths for low latency later.
 
