@@ -925,7 +925,7 @@ class magikEspellCheck extends Syllabifier {
 
     generateMutations(word) {
 
-        let candidate = this.splitInSyllables(word).join(""); console.log(candidate);
+        let candidate = this.splitInSyllables(word).join("");
         let posiblePatterns = [];
         const vowels = this.vowels;
         const consonants = [
@@ -1019,7 +1019,7 @@ class magikEspellCheck extends Syllabifier {
         let foundCache = this.foundCache;
         let sugestions = [];
 
-        console.log(patterns)
+        // console.log(patterns)
         patterns.some((_pattern) => {
 
             let ending = _pattern.split("}(")[1].split("(")[0];
