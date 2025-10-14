@@ -474,7 +474,7 @@ class Syllabifier extends coreMethodsExt {
         const ogSyllables = [...syllables].join("").replaceAll(",", "");
         const lastS = syllables[syllables.length - 1];
         const lastLastS = syllables[syllables.length - 2] ?? false;
-        const hasMutated = s => { console.log(ogSyllables + " " + syllables); };
+        const hasMutated = () => { return ogSyllables === syllables.join("").replaceAll(",", "") };
 
         if (!lastLastS) return this.cutUntilTrue(syllables);
 
@@ -810,6 +810,7 @@ class magikEspellCheck extends Syllabifier {
             prevInsert = V2F ? syllable[0] : syllable[1],
             makeTest = prev => this.replaceCharAt(syllable, 1, prev + this.vowelsWildcard);
 
+
         // If the first three characters are consonants and the test  syllable (CVC) is valid
         // Change syllable to test pattern
         if (this.getEst(F3C) === "CCC" && this.isValidSyllable(makeTest(prevInsert)))
@@ -831,13 +832,9 @@ class magikEspellCheck extends Syllabifier {
 
 
         // IF CC COMB IS INVALID AND 3 OR MORE CHAR EXIST
-        if (!V2F) {
-
-            let test = this.insertChar(syllable, 0, this.vowelsWildcard);
-
-            console.log(test)
-
-        }
+        if (!V2F)
+            console.log("hrer");
+        //return this.insertChar(syllable, 0, this.vowelsWildcard);
 
         // IF CC COMB IS INVALID AND 3 OR MORE CHAR EXIST
         if (V2F)
@@ -858,7 +855,6 @@ class magikEspellCheck extends Syllabifier {
         let ogSyllabifier = new Syllabifier();
         let epochs = 0, hasValidSyllables = false;
 
-        console.log(syllables);
 
         if (this.check(syllables, true))
             return syllables;
@@ -869,7 +865,8 @@ class magikEspellCheck extends Syllabifier {
 
         while (epochs < this.epochs && !hasValidSyllables) {
 
-            [...syllables].forEach((s, index) => {
+
+            [...syllables].some((s, index) => {
 
                 if (this.isValidSyllable(s))
                     return;
@@ -878,6 +875,13 @@ class magikEspellCheck extends Syllabifier {
                 if (this.isValidSyllable(s)) {
                     syllables[index] = s; return;
                 }
+                let cutTest = this.cutUntilTrue(s);
+
+                if (this.isValidSyllable(cutTest[1]))
+                    syllables.splice(index + 1, 0, cutTest[1]);
+
+                syllables[index] = cutTest[0];
+                return true;
             })
 
             if (this.check(syllables.join(""), true))
