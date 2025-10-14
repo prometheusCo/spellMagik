@@ -49,12 +49,6 @@ class coreMethods {
     //  Minimum similarity to accept suggestion (0–1). Higher => stricter
     stringDiff = 0.7;
 
-    /* String diff tolerance for especial cases ( swaped initial letters for exam)
-    =====> */  diffTolerance = 0.15;
-
-    // Score penalty factor for privileged strs
-    // Use to adjudicate higher score to those cases with length closest to ogWord
-    privilegedCharsDeviation = 0.07;
 
     //  Cap on suggestions returned
     maxNumSuggestions = 10;
@@ -161,10 +155,21 @@ class coreMethods {
     isInverted = (a, b) => a.split("").reverse().join("") == b
 
     //
-    normalize = s => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, (m, i, a) => (m === '\u0303' && /[nN]/.test(a[i - 1])) ? m : '').normalize('NFC') : s;
+    normalize = s => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, (m, i, a) => (m === '\u0303' && /[nN]/.test(a[i - 1])) ? m : '').normalize('NFC').toLowerCase() : s;
 
     // Silent exec
     _null = a => a;
+
+    // Map a string to C/V, then drop items whose pattern has too many in a row.
+    // Discards any word with 3+ consecutive vowels or consonants
+    discardInvalidCV(word) {
+
+        let arr = word.split("");
+        const v = 'aeiou', c = 'bcdfghjklmnpqrstvwxyz';
+        const rx = new RegExp(`([${v}]{3,}|[${c}]{3,})`, 'i');
+        return arr.filter(w => !rx.test(w.toLowerCase()));
+    }
+
 
     //
     //
@@ -471,11 +476,12 @@ class Syllabifier extends coreMethodsExt {
     //
     rulesApply = (syllables) => {
 
-        const ogSyllables = [...syllables].join("");
+        const ogSyllables = [...syllables].join("").replaceAll(",", "");
         const lastS = syllables[syllables.length - 1];
         const lastLastS = syllables[syllables.length - 2] ?? false;
+        const hasMutated = () => { return ogSyllables === syllables.join("").replaceAll(",", "") };
 
-        if (!lastLastS) return syllables;
+        if (!lastLastS) return this.cutUntilTrue(syllables);
 
         const lasSEst = this.getEst(lastS);
         const firstLastS = lastS.slice(0, 1);
@@ -493,6 +499,7 @@ class Syllabifier extends coreMethodsExt {
 
         // If the "syllable" is a digraph (rr,ll,ch), merge into the previous one
         if (this.isTwoLettersSounds(lastS)) {
+
             syllables[syllables.length - 2] = syllables[syllables.length - 2] + lastS;
             syllables.pop();
             return syllables;
@@ -504,7 +511,7 @@ class Syllabifier extends coreMethodsExt {
             this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
         //If syllable is still unmutated and is invalid and it's made of 2 CC            
-        if (syllables.join("") === ogSyllables && !this.isValidSyllable(syllables.at(-1)) && this.getEst(lastS) === "CC") {
+        if (!hasMutated() && !this.isValidSyllable(syllables.at(-1)) && this.getEst(lastS) === "CC") {
 
             // we test removing last C, and adding a V at the begining if syllable doesn't end in s
             let test = this.vowelsWildcard + lastS.slice(0, 1);
@@ -514,8 +521,9 @@ class Syllabifier extends coreMethodsExt {
 
         // If syllable is still unmutated  we look for an ending valid syllable from rigth to left
         // oposed to the normal flow => from left to rigth
-        if (syllables.join("") === ogSyllables)
+        if (!hasMutated())
             syllables = this.cutUntilTrue(syllables);
+
 
         // Final cleanup
         return typeof syllables === "object" ? syllables.filter((s) => s !== "") : syllables;
@@ -613,6 +621,7 @@ class magikEspellCheck extends Syllabifier {
 
     // Returns true if a char is adyacent to another in a qwerty keyboard
     adjacentQwerty = (a, b) => {
+
         a = (a || '').toLowerCase(); b = (b || '').toLowerCase();
         let rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"], ra = -1, rb = -1, ca = 0, cb = 0, i = 0, ia = 0, ib = 0;
         for (; i < 3; i++) ia = rows[i].indexOf(a), ib = rows[i].indexOf(b), ra = ra < 0 && ia > -1 ? i : ra, ca = ia > -1 ? ia : ca, rb = rb < 0 && ib > -1 ? i : rb, cb = ib > -1 ? ib : cb;
@@ -649,7 +658,8 @@ class magikEspellCheck extends Syllabifier {
         const results = await Promise.all([
 
             this.correct("evolucin", false, true),
-            this.correct("revluchn", false, true),
+            this.correct("rvluchn", false, true),
+            this.correct("aslonjs", false, true),
 
         ]);
 
@@ -670,37 +680,54 @@ class magikEspellCheck extends Syllabifier {
 
         this.dictData.forEach((word) => {
 
-            let ogWord = word;
-            word = this.normalize(word)
+            let ogWord = word.toLowerCase();
+            word = this.normalize(word);
+
+            const fc = word.slice(0, 1).toLowerCase();
             const f2c = word.slice(0, 2).toLowerCase();
-            const fw = f2c.slice(0, 1).toLowerCase();
-            const we = word[word.length - 1];
-            const ln = word.length;
-
-            // If first level (a, b ,c ... [first letter]) is undef for this word, we make it
-            if (!this.dictMapped.has(`${fw}`))
-                this.dictMapped.set(`${fw}`, new Map());
-
-            // If second level is also undef we made it
-            if (!this.dictMapped.get(`${fw}`).has(`${f2c}`))
-                this.dictMapped.get(`${fw}`).set(`${f2c}`, new Map())
-
-            // If third level...
-            if (!this.dictMapped.get(`${fw}`).get(`${f2c}`).has(`${we}`))
-                this.dictMapped.get(`${fw}`).get(`${f2c}`).set(`${we}`, new Map())
-
-            // If 4th level..
-            if (!this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${we}`).has(`${ln}`))
-                this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${we}`).set(`${ln}`, new Set())
-
-            // Storing word in set...
-            this.dictMapped.get(`${fw}`).get(`${f2c}`).get(`${we}`).get(`${ln}`).add(word.toLowerCase());
-
-
-            if (!/[à-ÿ]/i.test(ogWord)) return;
+            const f3c = word.slice(0, 3).toLowerCase();
+            const we = word.slice(-1);
 
             // For accents handling
-            this.accentedWords.set(`${word}`, ogWord)
+            /[à-ÿ]/i.test(ogWord) ? this.accentedWords.set(`${word}`, ogWord) : null;
+
+
+            // If first level (a, b ,c ... [first letter]) is undef for this word, we make it
+            if (!this.dictMapped.has(`${fc}`))
+                this.dictMapped.set(`${fc}`, new Map());
+
+            // If second level is also undef we made it
+            if (!this.dictMapped.get(`${fc}`).has(`${f2c}`))
+                this.dictMapped.get(`${fc}`).set(`${f2c}`, [[], new Set(), new Map()])
+
+            // If third level...
+            if (!this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].has(`${f3c}`))
+                this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].set(`${f3c}`, [[], new Set(), new Map()]);
+
+            // If 4th level...
+            if (!this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${we}`))
+                this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].set(`${we}`, [[], new Set()]);
+
+
+            //Storing word in levels acording word's deep
+            //
+            // Storing word in second level by default
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[0].push(word);
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[1].add(word);
+
+
+            //If there's no third level we skiped the rest...
+            if (f3c.length < 3)
+                return;
+
+            // Storing word in third level 
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[0].push(word);
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[1].add(word);
+
+
+            // Storing word in 4th level 
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${we}`)[0].push(word);
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${we}`)[1].add(word);
 
 
         })
@@ -719,20 +746,26 @@ class magikEspellCheck extends Syllabifier {
     // Get Set of candidates sharing same first two chars, if legal.
     // Returns Set<string> or false if missing/illegal prefix.
     //
-    getSet(word, len = false) {
+    getSet(word, we = false) {
 
+        const fc = word.slice(0, 1);
         const f2c = word.slice(0, 2);
-        const fc = f2c.slice(0, 1);
-        const we = word[word.length - 1];
-        const ln = !len ? word.length : len;
+        const f3c = word.slice(0, 3);
+        we = !we ? word.slice(-1) : we;
 
-        try {
-            return this.dictMapped.get(`${fc}`).get(`${f2c}`).get(`${we}`).get(`${ln}`);
-
-        } catch (error) {
+        if (!this.dictMapped.get(`${fc}`) || !this.dictMapped.get(`${fc}`).get(`${f2c}`))
             return false;
-        }
 
+        let secondLevel = this.dictMapped.get(`${fc}`).get(`${f2c}`);
+        let thirdLevel = secondLevel[2].get(`${f3c}`);
+
+        if (f3c.length < 3 || !thirdLevel)
+            return secondLevel;
+
+        if (!thirdLevel[2].get(`${we}`))
+            return thirdLevel;
+
+        return thirdLevel[2].get(`${we}`);
     }
 
 
@@ -764,7 +797,7 @@ class magikEspellCheck extends Syllabifier {
         }
 
         let set = this.getSet(word);
-        if (!set || !set.has(word))
+        if (!set || !set[1].has(word))
             return false;
 
         return true;
@@ -783,6 +816,7 @@ class magikEspellCheck extends Syllabifier {
             prevInsert = V2F ? syllable[0] : syllable[1],
             makeTest = prev => this.replaceCharAt(syllable, 1, prev + this.vowelsWildcard);
 
+
         // If the first three characters are consonants and the test  syllable (CVC) is valid
         // Change syllable to test pattern
         if (this.getEst(F3C) === "CCC" && this.isValidSyllable(makeTest(prevInsert)))
@@ -793,7 +827,6 @@ class magikEspellCheck extends Syllabifier {
         let test = syllable[0] + this.vowelsWildcard + syllable[1] + syllable[2];
         if (this.getEst(syllable) === "CCV" && !V2F && this.isValidSyllable(test) && syllable[1] !== this.vowelsWildcard)
             return test;
-
 
         // IF CC COMB IS INVALID and only 2 chars EXIST...
         if (this.getEst(syllable) == "CC" && !V2F)
@@ -806,7 +839,7 @@ class magikEspellCheck extends Syllabifier {
 
         // IF CC COMB IS INVALID AND 3 OR MORE CHAR EXIST
         if (!V2F)
-            return this.insertChar(syllable, 0, this.vowelsWildcard)
+            return this.insertChar(syllable, 0, this.vowelsWildcard);
 
         // IF CC COMB IS INVALID AND 3 OR MORE CHAR EXIST
         if (V2F)
@@ -827,12 +860,18 @@ class magikEspellCheck extends Syllabifier {
         let ogSyllabifier = new Syllabifier();
         let epochs = 0, hasValidSyllables = false;
 
+
         if (this.check(syllables, true))
             return syllables;
 
+        // Handling worst case scenarios in wich no valid syllabell can be found
+        /*if (syllables.length === 1)
+            syllables = this.cut*/
+
         while (epochs < this.epochs && !hasValidSyllables) {
 
-            [...syllables].forEach((s, index) => {
+
+            [...syllables].some((s, index) => {
 
                 if (this.isValidSyllable(s))
                     return;
@@ -841,6 +880,13 @@ class magikEspellCheck extends Syllabifier {
                 if (this.isValidSyllable(s)) {
                     syllables[index] = s; return;
                 }
+                let cutTest = this.cutUntilTrue(s);
+
+                if (this.isValidSyllable(cutTest[1]))
+                    syllables.splice(index + 1, 0, cutTest[1]);
+
+                syllables[index] = cutTest[0];
+                return true;
             })
 
             if (this.check(syllables.join(""), true))
@@ -848,6 +894,7 @@ class magikEspellCheck extends Syllabifier {
 
             syllables = ogSyllabifier.splitInSyllables(syllables.join(""))
             epochs++;
+
         }
 
         return syllables;
@@ -862,99 +909,101 @@ class magikEspellCheck extends Syllabifier {
     //   - ending wildcard alignment
     //
 
+    isValidP(p) {
+
+        if (!this.isValid(p))
+            return false;
+
+        let set = this.getSet(p.slice(0, 3));
+        if (!set || !this.isF2Valid(p.slice(0, 2)) || p[3] !== "[") return false;
+
+        if (set[0][0][2] !== p[2])
+            return false;
+
+        return true;
+    }
+
     generateMutations(word) {
 
-        let candidate = this.splitInSyllables(word);
-        let F2C = candidate.join("").slice(0, 2);
-        let finalCandidates = [];
-
-        let start = [F2C], middle = candidate.join(""), end = candidate.at(-1).slice(-1);
+        let candidate = this.splitInSyllables(word).join(""); console.log(candidate);
+        let posiblePatterns = [];
         const vowels = this.vowels;
-        let startLetter = start[0][0];
         const consonants = [
             'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm',
             'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z'
         ]
+        const swapFirstTwo = s => s.length < 2 ? s : s[1] + s[0] + s.slice(2);
 
-        // STARTS IN C BUT IT WAS MEANT TO START IN V
-        if (this.getEst(startLetter) === "C") {
-            vowels.forEach((l) => { start.push(l + startLetter) });
-            vowels.forEach((l) => { start.push(l + word.slice(1, 2)) });
+
+        let start = candidate.slice(0, 3);
+        let rest = candidate.length > 3 ? candidate.slice(3) : "";
+        let end = candidate.length > 3 ? candidate.slice(-1) : "";
+        let startVrs = [start], startVrs1 = [], startVrs2 = [];
+        let f2cO = word.slice(0, 2);// first 2 chars from og word
+
+        const opositeFill = (p, i) => {
+
+            if (this.getEst(p[i]) === "C")
+                vowels.forEach((v) => posiblePatterns.push(v + this.replaceCharAt(p, 2, "")))
+
+            if (this.getEst(p[i]) === "V")
+                vowels.forEach((c) => posiblePatterns.push(c + this.replaceCharAt(p, 2, "")))
         }
-
-        // STARTS IN V BUT IT WAS MEANT TO START IN C
-        if (this.getEst(startLetter) === "V" && this.isValidSyllable(this.consonantssWildcard + startLetter))
-            consonants.forEach((l) => { start.push(l + startLetter) });
-
-
-        // IT WAS MEANT TO START WITH THE FIRST 2 LETTERS  ORDER SWAPPED 
-        if (this.isValidSyllable(F2C[1] + F2C[0]))
-            start.unshift([F2C[1] + F2C[0], true]);
-
-
-        // WORD'S START VRS IF ANY (expand wildcard to concrete vowels/consonants)
-        if (/[§|~]/.test(F2C)) {
-
-            F2C.indexOf(this.vowelsWildcard) >= 0 ? vowels.forEach((l) => { start.push(F2C.replace(this.vowelsWildcard, l)) })
-                : consonants.forEach((l) => { start.push(F2C.replace(this.consonantssWildcard, l)) });
-        }
-
-        // PATTER MIDDLE: remove first two chars and terminal suffix to isolate the middle-run length
-        middle = middle.slice(2, -(end.length))
-
-        // GENERATING FINAL MUTATIONS TO TEST AGAINST CLUSTER
-        const n = middle.length;
-        [...start].forEach((_st) => {
-
-            let st = typeof _st === "object" ? _st[0] : _st;
-            let n = middle.length;
-
-            for (let index = -2; index < 2; index++) {
-
-                // NOTE: [a-z] here is ASCII-limited by design, because dictionary tokens are normalized ASCII.
-                let expReg = `${st}[a-z]{${(n + index)}}${end}`;
-                let lengthTotal = st.length + (n + index);
-
-                if (/[§|~]/.test(st) || (n + index) <= 0)
-                    continue;
-
-                finalCandidates.push([expReg, (lengthTotal) + end.length, (typeof _st === "object" ? true : false)]);
-            }
-        })
 
         //
-        // EXPANDING ENDINGS
-        let endingVrs = [];
+        // EXPANDING PLACEHOLDERS TO INFERE  SEARCH POOL IF ANY
+        //
 
-        // WORD SHOULD HAVE BEEN ENDED IN VOWEL BUT IT ENDS IN CONSONANTS
-        if (this.isValidSyllable(end + this.vowelsWildcard))
-            endingVrs.push((end + this.vowelsWildcard));
+        if (/[§|~]/.test(start)) {
 
-        // GENERATING FINAL MUTATIONS TO TEST AGAINST CLUSTER CHANGING ENDINGS INSTEAD
-        [...finalCandidates].forEach((_candidate) => {
+            vowels.forEach((l) => { startVrs.push(start.replace(this.vowelsWildcard, l)) })
+            consonants.forEach((l) => { startVrs.push(start.replace(this.vowelsWildcard, l)) })
+        }
 
-            endingVrs.forEach((ending) => {
+        // ACTUALLY CREATING PATTERNS
+        posiblePatterns = startVrs.map((st) => st + "[a-zñ]" + `{${rest.length - 1},${rest.length + 2}}(${end}([aeiou])?)$`);
 
-                let [candidate, length, swapped] = _candidate;
-                length = length - 1 + ending.length;
-                let newCand = [candidate.slice(0, -1) + ending, length, swapped];
-
-                if (!/[§|~]/.test(newCand[0])) {
-                    finalCandidates.push(newCand); return;
-                }
-
-                vowels.forEach((l) => {
-                    if (l === this.vowelsWildcard)
-                        return;
-                    let newV = [candidate.slice(0, -1) + ending.replace(this.vowelsWildcard, l), length, true];
-                    finalCandidates.push(newV);
-                })
+        //HAVE WE SHOULDED USED OG 3 CHAR INSTEAD OF PATTERN RESULT
+        [...posiblePatterns].forEach((p) => { posiblePatterns.push(this.replaceCharAt(p, 2, f2cO[1])) });
 
 
-            })
+        // CREATING SWAPED FIRST 2 CHARS VRS
+        [...posiblePatterns].forEach((p) => posiblePatterns.push(swapFirstTwo(p)));
+
+        //SANITY CHECK OF ONLY TWO CHARS STARTS
+        [...posiblePatterns].forEach((p) => {
+
+            if (p[2] !== "[") return;
+
+            consonants.forEach((c) => posiblePatterns.push(p.replaceAll("[", `${c}[`)))
+            vowels.forEach((v) => posiblePatterns.push(p.replaceAll("[", `${v}[`)))
         });
 
-        return finalCandidates;
+
+        //ADDING C OR V ACORDINGLY IN EACH CASE 
+        if (!/[§|~]/.test(candidate.slice(0, 2))) {
+            [...posiblePatterns].forEach((p) => { opositeFill(p, 0); })
+        }
+
+        // SANITY CHECK ADDING FOR INVALID P[1] + P[2] SYLLABLES
+        [...posiblePatterns].forEach((p) => {
+
+            if (this.isValidSyllable(p[1] + p[2]))
+                return;
+
+            // RE-EXPANDING ...
+            consonants.forEach((c) => this.adjacentQwerty(c, p[2]) && this.isValidSyllable(c, p[2]) ?
+                posiblePatterns.push(this.replaceCharAt(p, 2, c)) : null)
+
+            vowels.forEach((v) => this.adjacentQwerty(v, p[2]) && this.isValidSyllable(v, p[2]) ?
+                posiblePatterns.push(this.replaceCharAt(p, 2, v)) : null)
+        });
+
+
+        // FINAL CLEAN UP
+        posiblePatterns = [...new Set(posiblePatterns.filter((p) => this.isValidP(p)))];
+
+        return posiblePatterns;
     }
 
     //
@@ -970,24 +1019,24 @@ class magikEspellCheck extends Syllabifier {
         let foundCache = this.foundCache;
         let sugestions = [];
 
+        console.log(patterns)
         patterns.some((_pattern) => {
 
-            let [pattern, ln, sw] = _pattern;
-            let set = this.getSet(pattern, ln)
+            let ending = _pattern.split("}(")[1].split("(")[0];
+            let set = this.getSet(_pattern, ending)
 
             if (!set) return;
 
-            let reg = new RegExp(pattern, "i")
-            let pool = [...set];
+            let reg = new RegExp(_pattern, "i");
+            let tinySet = this.getSet(_pattern)[0].filter((a) => a.at(-2) === ending)
+
+            let pool = [...set[0], ...tinySet];
 
             pool.forEach((w) => {
 
-                if (ln !== w.length || foundCache.has(w) || !reg.test(w)) return;
+                if (foundCache.has(w) || !reg.test(w)) return;
 
                 let score = this.diffScoreStrings(ogWord, w);
-
-                // If this pattern is privileged, reduce the difference level
-                sw ? score = score + ((this.diffTolerance) - this.pos(ogWord.length - ln) * this.privilegedCharsDeviation) : null;
 
                 if (score < this.stringDiff) return;
 
@@ -1022,7 +1071,7 @@ class magikEspellCheck extends Syllabifier {
         let rInt; // use to clear callback int
 
         //
-        // This helper sustitutes a promise paradigm for a callback paradigm, wich I preffer.
+        // This helper sustitutes a promise paradigm for a callback return  paradigm, wich I preffer.
         //
         const waitTillReady = () => {
             rInt = setInterval(() => { this.ready ? clearInterval(rInt) & run() : null }, 500)
@@ -1039,7 +1088,7 @@ class magikEspellCheck extends Syllabifier {
             //  
             if (this.check(word)) {
 
-                let r = [this.addAccents(word)];
+                let r = [this.addAccents(word), 0.99];//Default accented ver if any
 
                 // If word is 100% ok we return true, if only lacks accents
                 // we return accented version as unique suggestion
@@ -1053,7 +1102,8 @@ class magikEspellCheck extends Syllabifier {
             let mutations = this.generateMutations(word);
 
             let sugestions = this.returnSuggestions([...mutations], word);
-            this.isValid(start) && this.ready && !silentExec ? this.printTime(start, " EXEC TIME", 10) : null;
+            this.isValid(start) && this.ready && !silentExec ?
+                this.printTime(start, " EXEC TIME", 10) : null;
 
             if (this.ready && this.warmStart)
                 this.warmStart = false;
