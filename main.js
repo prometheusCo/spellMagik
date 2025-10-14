@@ -635,7 +635,6 @@ class magikEspellCheck extends Syllabifier {
         // penalizing strings that are to different from one to another
         return raw - diffChars.size * (0.09);
 
-
     }
 
 
