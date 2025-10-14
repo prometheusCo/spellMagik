@@ -746,12 +746,12 @@ class magikEspellCheck extends Syllabifier {
     // Get Set of candidates sharing same first two chars, if legal.
     // Returns Set<string> or false if missing/illegal prefix.
     //
-    getSet(word, len = false) {
+    getSet(word, we = false) {
 
         const fc = word.slice(0, 1);
         const f2c = word.slice(0, 2);
         const f3c = word.slice(0, 3);
-        const we = word.slice(-1);
+        we = !we ? word.slice(-1) : we;
 
         if (!this.dictMapped.get(`${fc}`) || !this.dictMapped.get(`${fc}`).get(`${f2c}`))
             return false;
@@ -1022,17 +1022,19 @@ class magikEspellCheck extends Syllabifier {
         console.log(patterns)
         patterns.some((_pattern) => {
 
-            let [pattern, ln] = _pattern;
-            let set = this.getSet(pattern, ln)
+            let ending = _pattern.split("}(")[1].split("(")[0];
+            let set = this.getSet(_pattern, ending)
 
             if (!set) return;
 
-            let reg = new RegExp(pattern, "i")
-            let pool = set[0];
+            let reg = new RegExp(_pattern, "i");
+            let tinySet = this.getSet(_pattern)[0].filter((a) => a.at(-2) === ending)
+
+            let pool = [...set[0], ...tinySet];
 
             pool.forEach((w) => {
 
-                if (ln !== w.length || foundCache.has(w) || !reg.test(w)) return;
+                if (foundCache.has(w) || !reg.test(w)) return;
 
                 let score = this.diffScoreStrings(ogWord, w);
 
