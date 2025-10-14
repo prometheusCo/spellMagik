@@ -44,17 +44,11 @@ class coreMethods {
     dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionaryC.txt";
 
     //  Max refinement passes when spliting in syllables
-    epochs = 4;
+    epochs = 3;
 
     //  Minimum similarity to accept suggestion (0–1). Higher => stricter
     stringDiff = 0.7;
 
-    /* String diff tolerance for especial cases ( swaped initial letters for exam)
-    =====> */  diffTolerance = 0.15;
-
-    // Score penalty factor for privileged strs
-    // Use to adjudicate higher score to those cases with length closest to ogWord
-    privilegedCharsDeviation = 0.07;
 
     //  Cap on suggestions returned
     maxNumSuggestions = 10;
@@ -906,21 +900,52 @@ class magikEspellCheck extends Syllabifier {
 
     generateMutations(word) {
 
-        let candidate = this.splitInSyllables(word);
-        let F2C = candidate.join("").slice(0, 2);
-        let finalCandidates = [];
+        let candidate = this.splitInSyllables(word); console.log(candidate);
+        let posiblePatterns = [];
 
-        let start = [F2C], middle = candidate.join(""), end = candidate.at(-1).slice(-1);
         const vowels = this.vowels;
-        let startLetter = start[0][0];
         const consonants = [
             'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm',
             'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z'
         ]
 
-        console.log(candidate);
+        let start = candidate[0];
+        let startVrs = [], startVrs1 = [], startVrs2 = [];
+        let f2cO = word.slice(0, 2);// first 2 chars from og word
 
-        return finalCandidates;
+        let end = candidate.length > 1 ? candidate.at(-1) : "";
+        candidate.length > 2 ? candidate.pop() & candidate.shift() : null;
+        let middle = candidate.join("");
+
+        // Quick sanity check
+        middle.includes(end) ? middle = "" : null;
+
+        //
+        // EXPANDING PLACEHOLDERS TO INFERE  SEARCH POOL IF ANY
+        //
+        if (/[§|~]/.test(start)) {
+
+            vowels.forEach((l) => { startVrs.push(start.replace(this.vowelsWildcard, l)) })
+            consonants.forEach((l) => { startVrs.push(start.replace(this.vowelsWildcard, l)) })
+        }
+
+        // MAKING STANDARD 3 LETTERS VRS FOR STARTS
+        startVrs1 = startVrs.map((v) => v + middle[0] ?? (start[3] ?? end[0])); startVrs2 = [...startVrs];
+
+        // SANITY CHECK IN CASE THAT WE SHOULDED HAVE USE A REPLACED CONSONANT
+        if (f2cO[1] !== start[1] && start[1] === this.vowelsWildcard)
+            startVrs2 = startVrs.map((v) => v + f2cO[1] ?? "");
+
+        //SANITY CHECK (REMOVIN' INVALID STARTS)
+        posiblePatterns = [...startVrs1, ...startVrs2].filter((s) => !/[§|~]/.test(s) && this.isF2Valid(s))
+
+        let n = (middle.length + end.length - 1);
+        let lc = end[end.length - 1];
+
+        // ACTUALLY CREATING PATTERNS
+        posiblePatterns = posiblePatterns.map((p) => p + "[a-zñ]" + `{${n - 1},${n + 2}}(${lc}([aeiou])?)$`);
+
+        return posiblePatterns;
     }
 
     //
@@ -936,9 +961,10 @@ class magikEspellCheck extends Syllabifier {
         let foundCache = this.foundCache;
         let sugestions = [];
 
+        console.log(patterns)
         patterns.some((_pattern) => {
 
-            let [pattern, ln, sw] = _pattern;
+            let [pattern, ln] = _pattern;
             let set = this.getSet(pattern, ln)
 
             if (!set) return;
@@ -951,9 +977,6 @@ class magikEspellCheck extends Syllabifier {
                 if (ln !== w.length || foundCache.has(w) || !reg.test(w)) return;
 
                 let score = this.diffScoreStrings(ogWord, w);
-
-                // If this pattern is privileged, reduce the difference level
-                sw ? score = score + ((this.diffTolerance) - this.pos(ogWord.length - ln) * this.privilegedCharsDeviation) : null;
 
                 if (score < this.stringDiff) return;
 
@@ -1019,7 +1042,8 @@ class magikEspellCheck extends Syllabifier {
             let mutations = this.generateMutations(word);
 
             let sugestions = this.returnSuggestions([...mutations], word);
-            this.isValid(start) && this.ready && !silentExec ? this.printTime(start, " EXEC TIME", 10) : null;
+            this.isValid(start) && this.ready && !silentExec ?
+                this.printTime(start, " EXEC TIME", 10) : null;
 
             if (this.ready && this.warmStart)
                 this.warmStart = false;
