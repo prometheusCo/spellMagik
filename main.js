@@ -686,7 +686,7 @@ class magikEspellCheck extends Syllabifier {
             const fc = word.slice(0, 1).toLowerCase();
             const f2c = word.slice(0, 2).toLowerCase();
             const f3c = word.slice(0, 3).toLowerCase();
-            const ln = word.length;
+            const we = word.slice(-1);
 
             // For accents handling
             /[à-ÿ]/i.test(ogWord) ? this.accentedWords.set(`${word}`, ogWord) : null;
@@ -705,8 +705,8 @@ class magikEspellCheck extends Syllabifier {
                 this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].set(`${f3c}`, [[], new Set(), new Map()]);
 
             // If 4th level...
-            if (!this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${ln}`))
-                this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].set(`${ln}`, [[], new Set()]);
+            if (!this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${we}`))
+                this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].set(`${we}`, [[], new Set()]);
 
 
             //Storing word in levels acording word's deep
@@ -726,8 +726,8 @@ class magikEspellCheck extends Syllabifier {
 
 
             // Storing word in 4th level 
-            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${ln}`)[0].push(word);
-            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${ln}`)[1].add(word);
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${we}`)[0].push(word);
+            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${we}`)[1].add(word);
 
 
         })
@@ -751,7 +751,7 @@ class magikEspellCheck extends Syllabifier {
         const fc = word.slice(0, 1);
         const f2c = word.slice(0, 2);
         const f3c = word.slice(0, 3);
-        const lnl = !len ? word.length : len;
+        const we = word.slice(-1);
 
         if (!this.dictMapped.get(`${fc}`) || !this.dictMapped.get(`${fc}`).get(`${f2c}`))
             return false;
@@ -762,10 +762,10 @@ class magikEspellCheck extends Syllabifier {
         if (f3c.length < 3 || !thirdLevel)
             return secondLevel;
 
-        if (!thirdLevel[2].get(`${lnl}`))
+        if (!thirdLevel[2].get(`${we}`))
             return thirdLevel;
 
-        return thirdLevel[2].get(`${lnl}`);
+        return thirdLevel[2].get(`${we}`);
     }
 
 
