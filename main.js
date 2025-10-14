@@ -44,7 +44,7 @@ class coreMethods {
     dictionaryUrl = "https://raw.githubusercontent.com/prometheusCo/spellMagik/refs/heads/main/Dicts/Es/dictionaryC.txt";
 
     //  Max refinement passes when spliting in syllables
-    epochs = 3;
+    epochs = 4;
 
     //  Minimum similarity to accept suggestion (0–1). Higher => stricter
     stringDiff = 0.7;
@@ -471,11 +471,12 @@ class Syllabifier extends coreMethodsExt {
     //
     rulesApply = (syllables) => {
 
-        const ogSyllables = [...syllables].join("");
+        const ogSyllables = [...syllables].join("").replaceAll(",", "");
         const lastS = syllables[syllables.length - 1];
         const lastLastS = syllables[syllables.length - 2] ?? false;
+        const hasMutated = s => { console.log(ogSyllables + " " + syllables); };
 
-        if (!lastLastS) return syllables;
+        if (!lastLastS) return this.cutUntilTrue(syllables);
 
         const lasSEst = this.getEst(lastS);
         const firstLastS = lastS.slice(0, 1);
@@ -493,6 +494,7 @@ class Syllabifier extends coreMethodsExt {
 
         // If the "syllable" is a digraph (rr,ll,ch), merge into the previous one
         if (this.isTwoLettersSounds(lastS)) {
+
             syllables[syllables.length - 2] = syllables[syllables.length - 2] + lastS;
             syllables.pop();
             return syllables;
@@ -504,7 +506,7 @@ class Syllabifier extends coreMethodsExt {
             this.moveAround(syllables, syllables.length - 1, lastS, "left");
 
         //If syllable is still unmutated and is invalid and it's made of 2 CC            
-        if (syllables.join("") === ogSyllables && !this.isValidSyllable(syllables.at(-1)) && this.getEst(lastS) === "CC") {
+        if (!hasMutated() && !this.isValidSyllable(syllables.at(-1)) && this.getEst(lastS) === "CC") {
 
             // we test removing last C, and adding a V at the begining if syllable doesn't end in s
             let test = this.vowelsWildcard + lastS.slice(0, 1);
@@ -514,8 +516,9 @@ class Syllabifier extends coreMethodsExt {
 
         // If syllable is still unmutated  we look for an ending valid syllable from rigth to left
         // oposed to the normal flow => from left to rigth
-        if (syllables.join("") === ogSyllables)
+        if (!hasMutated())
             syllables = this.cutUntilTrue(syllables);
+
 
         // Final cleanup
         return typeof syllables === "object" ? syllables.filter((s) => s !== "") : syllables;
@@ -818,7 +821,6 @@ class magikEspellCheck extends Syllabifier {
         if (this.getEst(syllable) === "CCV" && !V2F && this.isValidSyllable(test) && syllable[1] !== this.vowelsWildcard)
             return test;
 
-
         // IF CC COMB IS INVALID and only 2 chars EXIST...
         if (this.getEst(syllable) == "CC" && !V2F)
             return syllable[0] + this.vowelsWildcard + syllable[1];
@@ -829,8 +831,13 @@ class magikEspellCheck extends Syllabifier {
 
 
         // IF CC COMB IS INVALID AND 3 OR MORE CHAR EXIST
-        if (!V2F)
-            return this.insertChar(syllable, 0, this.vowelsWildcard)
+        if (!V2F) {
+
+            let test = this.insertChar(syllable, 0, this.vowelsWildcard);
+
+            console.log(test)
+
+        }
 
         // IF CC COMB IS INVALID AND 3 OR MORE CHAR EXIST
         if (V2F)
@@ -851,8 +858,14 @@ class magikEspellCheck extends Syllabifier {
         let ogSyllabifier = new Syllabifier();
         let epochs = 0, hasValidSyllables = false;
 
+        console.log(syllables);
+
         if (this.check(syllables, true))
             return syllables;
+
+        // Handling worst case scenarios in wich no valid syllabell can be found
+        /*if (syllables.length === 1)
+            syllables = this.cut*/
 
         while (epochs < this.epochs && !hasValidSyllables) {
 
@@ -872,6 +885,7 @@ class magikEspellCheck extends Syllabifier {
 
             syllables = ogSyllabifier.splitInSyllables(syllables.join(""))
             epochs++;
+
         }
 
         return syllables;
@@ -900,83 +914,7 @@ class magikEspellCheck extends Syllabifier {
             'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z'
         ]
 
-        // STARTS IN C BUT IT WAS MEANT TO START IN V
-        if (this.getEst(startLetter) === "C") {
-            vowels.forEach((l) => { start.push(l + startLetter) });
-            vowels.forEach((l) => { start.push(l + word.slice(1, 2)) });
-        }
-
-        // STARTS IN V BUT IT WAS MEANT TO START IN C
-        if (this.getEst(startLetter) === "V" && this.isValidSyllable(this.consonantssWildcard + startLetter))
-            consonants.forEach((l) => { start.push(l + startLetter) });
-
-
-        // IT WAS MEANT TO START WITH THE FIRST 2 LETTERS  ORDER SWAPPED 
-        if (this.isValidSyllable(F2C[1] + F2C[0]))
-            start.unshift([F2C[1] + F2C[0], true]);
-
-
-        // WORD'S START VRS IF ANY (expand wildcard to concrete vowels/consonants)
-        if (/[§|~]/.test(F2C)) {
-
-            F2C.indexOf(this.vowelsWildcard) >= 0 ? vowels.forEach((l) => { start.push(F2C.replace(this.vowelsWildcard, l)) })
-                : consonants.forEach((l) => { start.push(F2C.replace(this.consonantssWildcard, l)) });
-        }
-
-        // PATTER MIDDLE: remove first two chars and terminal suffix to isolate the middle-run length
-        middle = middle.slice(2, -(end.length))
-
-        // GENERATING FINAL MUTATIONS TO TEST AGAINST CLUSTER
-        const n = middle.length;
-        [...start].forEach((_st) => {
-
-            let st = typeof _st === "object" ? _st[0] : _st;
-            let n = middle.length;
-
-            for (let index = -2; index < 2; index++) {
-
-                // NOTE: [a-z] here is ASCII-limited by design, because dictionary tokens are normalized ASCII.
-                let expReg = `${st}[a-z]{${(n + index)}}${end}`;
-                let lengthTotal = st.length + (n + index);
-
-                if (/[§|~]/.test(st) || (n + index) <= 0)
-                    continue;
-
-                finalCandidates.push([expReg, (lengthTotal) + end.length, (typeof _st === "object" ? true : false)]);
-            }
-        })
-
-        //
-        // EXPANDING ENDINGS
-        let endingVrs = [];
-
-        // WORD SHOULD HAVE BEEN ENDED IN VOWEL BUT IT ENDS IN CONSONANTS
-        if (this.isValidSyllable(end + this.vowelsWildcard))
-            endingVrs.push((end + this.vowelsWildcard));
-
-        // GENERATING FINAL MUTATIONS TO TEST AGAINST CLUSTER CHANGING ENDINGS INSTEAD
-        [...finalCandidates].forEach((_candidate) => {
-
-            endingVrs.forEach((ending) => {
-
-                let [candidate, length, swapped] = _candidate;
-                length = length - 1 + ending.length;
-                let newCand = [candidate.slice(0, -1) + ending, length, swapped];
-
-                if (!/[§|~]/.test(newCand[0])) {
-                    finalCandidates.push(newCand); return;
-                }
-
-                vowels.forEach((l) => {
-                    if (l === this.vowelsWildcard)
-                        return;
-                    let newV = [candidate.slice(0, -1) + ending.replace(this.vowelsWildcard, l), length, true];
-                    finalCandidates.push(newV);
-                })
-
-
-            })
-        });
+        console.log(candidate);
 
         return finalCandidates;
     }
@@ -1063,7 +1001,7 @@ class magikEspellCheck extends Syllabifier {
             //  
             if (this.check(word)) {
 
-                let r = [this.addAccents(word)];
+                let r = [this.addAccents(word), 0.99];//Default accented ver if any
 
                 // If word is 100% ok we return true, if only lacks accents
                 // we return accented version as unique suggestion
