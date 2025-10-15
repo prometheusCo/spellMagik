@@ -102,7 +102,7 @@ class coreMethods {
     invalidSyllablesEndings = new Set(["k", "g", "c", "x", "f", "d", "v", "gn"]);
 
     // Secondary endings blacklist (more specific)
-    invalidSyllables2Endings = new Set(["vl"]);
+    invalidSyllables2Endings = new Set(["vl", "fn"]);
 
     // Exceptions that keep some endings correct despite blacklist above
     invalidSyllablesEndingsExceptions = new Set(["ac", "oc", "ec", "ic", "ag", "ex", "ed"]);
@@ -126,49 +126,24 @@ class coreMethods {
     // Simple one-liner helpers
     //
 
-
     // Absolute value (micro-helper)
     pos = n => n < 0 ? n * (-1) : n;
-
     // Guard against nullish/empty
     isValid = val => val !== undefined && val !== "" && val !== null && val !== "undefined";
-
     // Replace char at index
     replaceCharAt = (str, pos, char) => str.slice(0, pos) + char + str.slice(pos + 1);
-
     // Split array in two parts at index
     splitArrayAt = (arr, pos) => [arr.slice(0, pos), arr.slice(pos)];
-
     // Insert char AFTER position x
     insertChar = (y, x, c) => y.slice(0, x + 1) + c + y.slice(x + 1);
-
     // Check if two-letter token is a Spanish digraph
     isTwoLettersSounds = ll => this.twoLettersSounds.has(ll);
-
-    // Detect wildcard tokens in a string
-    hasSymbols = str => new RegExp(/[§|~]/).test(str);
-
-    // Count items containing substring
-    count = (arr, str) => [...arr].filter((a) => a.indexOf(str) >= 0).length
-
-    // Is an string an inverted version of another???
-    isInverted = (a, b) => a.split("").reverse().join("") == b
 
     //
     normalize = s => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, (m, i, a) => (m === '\u0303' && /[nN]/.test(a[i - 1])) ? m : '').normalize('NFC').toLowerCase() : s;
 
     // Silent exec
     _null = a => a;
-
-    // Map a string to C/V, then drop items whose pattern has too many in a row.
-    // Discards any word with 3+ consecutive vowels or consonants
-    discardInvalidCV(word) {
-
-        let arr = word.split("");
-        const v = 'aeiou', c = 'bcdfghjklmnpqrstvwxyz';
-        const rx = new RegExp(`([${v}]{3,}|[${c}]{3,})`, 'i');
-        return arr.filter(w => !rx.test(w.toLowerCase()));
-    }
 
 
     //
@@ -613,6 +588,8 @@ class Syllabifier extends coreMethodsExt {
 
 class magikEspellCheck extends Syllabifier {
 
+    noiseCache = new Set();
+
     constructor() {
 
         super();
@@ -629,24 +606,6 @@ class magikEspellCheck extends Syllabifier {
     }
 
 
-    //Core methods expansion of diffScoreStrings()
-    diffScoreStrings(original, sustitution) {
-
-        let raw = super.diffScoreStrings(original, sustitution);
-
-        if (raw >= 0.80 || raw < this.stringDiff) return raw;
-
-        original = original.split("");
-        sustitution = sustitution.split("");
-
-        let diffChars = new Set(sustitution.filter((a, i) => !original.indexOf(a) >= 0 && this.pos(original.indexOf(a) - i) >= 3));
-
-        // penalizing strings that are to different from one to another
-        return raw - diffChars.size * (0.09);
-
-    }
-
-
 
     // To proper warm up JIT given words must be incorrect,
     // otherwise it wouldn't fully warm up
@@ -657,7 +616,7 @@ class magikEspellCheck extends Syllabifier {
 
         const results = await Promise.all([
 
-            this.correct("evolucin", false, true),
+            this.correct("pkdms", false, true),
             this.correct("rvluchn", false, true),
             this.correct("aslonjs", false, true),
 
@@ -870,7 +829,6 @@ class magikEspellCheck extends Syllabifier {
 
         while (epochs < this.epochs && !hasValidSyllables) {
 
-
             [...syllables].some((s, index) => {
 
                 if (this.isValidSyllable(s))
@@ -911,21 +869,23 @@ class magikEspellCheck extends Syllabifier {
 
     isValidP(p) {
 
-        if (!this.isValid(p))
+        if (!this.isValid(p) || this.noiseCache.has(p))
             return false;
 
         let set = this.getSet(p.slice(0, 3));
-        if (!set || !this.isF2Valid(p.slice(0, 2)) || p[3] !== "[") return false;
+        if (!set || !this.isF2Valid(p.slice(0, 2)) || p[3] !== "[") {
+            this.noiseCache.add(p); return false;
+        }
 
-        if (set[0][0][2] !== p[2])
-            return false;
-
+        if (set[0][0][2] !== p[2]) {
+            this.noiseCache.add(p); return false;
+        }
         return true;
     }
 
     generateMutations(word) {
 
-        let candidate = this.splitInSyllables(word).join("");
+        let candidate = this.splitInSyllables(word).join("").replaceAll(",", "");
         let posiblePatterns = [];
         const vowels = this.vowels;
         const consonants = [
@@ -933,7 +893,6 @@ class magikEspellCheck extends Syllabifier {
             'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z'
         ]
         const swapFirstTwo = s => s.length < 2 ? s : s[1] + s[0] + s.slice(2);
-
 
         let start = candidate.slice(0, 3);
         let rest = candidate.length > 3 ? candidate.slice(3) : "";
@@ -947,7 +906,7 @@ class magikEspellCheck extends Syllabifier {
                 vowels.forEach((v) => posiblePatterns.push(v + this.replaceCharAt(p, 2, "")))
 
             if (this.getEst(p[i]) === "V")
-                vowels.forEach((c) => posiblePatterns.push(c + this.replaceCharAt(p, 2, "")))
+                consonants.forEach((c) => posiblePatterns.push(c + this.replaceCharAt(p, 2, "")))
         }
 
         //
@@ -957,11 +916,12 @@ class magikEspellCheck extends Syllabifier {
         if (/[§|~]/.test(start)) {
 
             vowels.forEach((l) => { startVrs.push(start.replace(this.vowelsWildcard, l)) })
-            consonants.forEach((l) => { startVrs.push(start.replace(this.vowelsWildcard, l)) })
+            consonants.forEach((l) => { startVrs.push(start.replace(this.consonantssWildcard, l)) })
         }
 
         // ACTUALLY CREATING PATTERNS
-        posiblePatterns = startVrs.map((st) => st + "[a-zñ]" + `{${rest.length - 1},${rest.length + 2}}(${end}([aeiou])?)$`);
+        posiblePatterns = startVrs.map((st) =>
+            st + "[a-zñ]" + `{${rest.length - 2 < 0 ? 0 : rest.length - 2},${rest.length + 2}}(${end}([aeiou])?)$`);
 
         //HAVE WE SHOULDED USED OG 3 CHAR INSTEAD OF PATTERN RESULT
         [...posiblePatterns].forEach((p) => { posiblePatterns.push(this.replaceCharAt(p, 2, f2cO[1])) });
@@ -992,10 +952,10 @@ class magikEspellCheck extends Syllabifier {
                 return;
 
             // RE-EXPANDING ...
-            consonants.forEach((c) => this.adjacentQwerty(c, p[2]) && this.isValidSyllable(c, p[2]) ?
+            consonants.forEach((c) => this.adjacentQwerty(c, p[2]) && this.isValidSyllable(c + p[2]) ?
                 posiblePatterns.push(this.replaceCharAt(p, 2, c)) : null)
 
-            vowels.forEach((v) => this.adjacentQwerty(v, p[2]) && this.isValidSyllable(v, p[2]) ?
+            vowels.forEach((v) => this.adjacentQwerty(v, p[2]) && this.isValidSyllable(v + p[2]) ?
                 posiblePatterns.push(this.replaceCharAt(p, 2, v)) : null)
         });
 
@@ -1019,7 +979,6 @@ class magikEspellCheck extends Syllabifier {
         let foundCache = this.foundCache;
         let sugestions = [];
 
-        // console.log(patterns)
         patterns.some((_pattern) => {
 
             let ending = _pattern.split("}(")[1].split("(")[0];
@@ -1046,8 +1005,24 @@ class magikEspellCheck extends Syllabifier {
             })
 
         })
+
+        // BONNUSES CHEAP SUGGESTIONS 
+        sugestions.forEach((s) => {
+
+            //MAKING VRS BY DEL FIRST CHAR
+            !foundCache.has(s[0].slice(1)) && this.check(s[0].slice(1)) ?
+                sugestions.push([s[0].slice(1), this.diffScoreStrings(ogWord, s[0].slice(1))]) &
+                foundCache.add(s[0].slice(1)) : null
+
+            //MAKIN VRS BY ADDING AN S
+            !foundCache.has(s[0] + "s") && this.check(s[0] + "s") ?
+                sugestions.push([s[0] + "s", this.diffScoreStrings(ogWord, s[0] + "s")]) &
+                foundCache.add(s[0] + "s") : null
+        })
+
         sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
         return sugestions.map((s) => [this.addAccents(s[0]), s[1]]);
+
     }
 
     //
