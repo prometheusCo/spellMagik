@@ -99,7 +99,7 @@ class coreMethods {
     twoLettersSounds = new Set(["rr", "ll", "ch"]);
 
     // Heuristics to reject clearly illegal syllable endings
-    invalidSyllablesEndings = new Set(["k", "g", "c", "x", "f", "d", "v", "gn", "w"]);
+    invalidSyllablesEndings = new Set(["k", "g", "c", "x", "f", "d", "v", "gn", "w", "h"]);
 
     // Secondary endings blacklist (more specific)
     invalidSyllables2Endings = new Set(["vl", "fn"]);
@@ -901,7 +901,7 @@ class magikEspellCheck extends Syllabifier {
     //
     // Validates valid patterns so we can discard those that won't match 
     // 
-    isValidP(p) {
+    isValidP(p, word = false) {
 
         if (!this.isValid(p) || this.noiseCache.has(p))
             return false;
@@ -914,6 +914,16 @@ class magikEspellCheck extends Syllabifier {
         if (set[0][0][2] !== p[2]) {
             this.noiseCache.add(p); return false;
         }
+
+        if (!!word) {
+
+            let firsLe = this.getEst(word[0]);
+            let firsLe2 = this.getEst(p[0]);
+
+            if (firsLe === "C" && firsLe2 === "C" && p[0] !== word[0])
+                return false;
+        }
+
         return true;
     }
 
@@ -929,14 +939,19 @@ class magikEspellCheck extends Syllabifier {
         return letters.filter((l) => this.adjacentQwerty(key, l));
     }
 
-    findAltEnd(end, rest) {
-        return this.adjacentQwertyFind(end).filter((s) => this.isValidSyllable(rest.slice(-1) + s));
+    findAltEnd(w) {
+
+        let a = w.slice(-2, 1);
+        let b = w.slice(-1);
+
+        return this.adjacentQwertyFind(b).filter((s) => this.isValidSyllable(a + s));
     }
 
 
     // Generates posible patterns using posible starts vrs 
     // & reg expressions
     generateMutations(word) {
+
 
         let candidate = this.splitInSyllables(word).join("").replaceAll(",", "");
         let posiblePatterns = [];
@@ -964,10 +979,6 @@ class magikEspellCheck extends Syllabifier {
         let endVrs = [];
 
 
-        // Sanity check for invalid ends
-        end = !this.hasValidEnding(rest + end) ? this.findAltEnd(end, rest)[0] : end;
-
-
         // Check validity  of pattern before adding it to final array
         const _add = (array, data) => {
 
@@ -978,7 +989,7 @@ class magikEspellCheck extends Syllabifier {
                 this.foundCache.add(data.split("[a-")[0] + ending)
                 : null;
 
-            if (noLength || !this.isValidP(data))
+            if (noLength || !this.isValidP(data, word))
                 return;
 
             array.push(data);
@@ -1051,7 +1062,7 @@ class magikEspellCheck extends Syllabifier {
         if (!/[§|~]/.test(end))
             return run();
 
-        this.findAltEnd(word.slice(-1), rest).forEach((l) => {
+        this.findAltEnd(word).forEach((l) => {
             endVrs.push(end.replace(this.vowelsWildcard, l))
         });
 
@@ -1076,6 +1087,7 @@ class magikEspellCheck extends Syllabifier {
 
     returnSuggestions(patterns, ogWord) {
 
+
         // PICKING UP ALREADY FORMED SUGGESTIONS FROM PREV STAGE
         // SOME PATTERNS ALREADY FORM A WORD AND NEED NO TESTING
         // SO ARE ELIMINATED FROM PATTERNS AND ADDED TO FINAL ARRAY
@@ -1086,8 +1098,18 @@ class magikEspellCheck extends Syllabifier {
 
         patterns.some((_pattern) => {
 
-            let ending = _pattern.split("}(")[1].split("(")[0];
-            let set = this.getSet(_pattern, ending)
+            let ending = _pattern.split("}(")[1].split("(")[0] ?? "";
+            let set = this.getSet(_pattern, ending);
+            let range = _pattern.split("]{")[1].split("}")[0].split(",") ?? false;
+
+            const outOfRange = (w) => {
+
+                w = w.length - 4;
+                if (!range) return false;
+                if (w > range[1] || w < range[0]) return true;
+
+                return false;
+            };
 
             if (!set) return;
 
@@ -1100,7 +1122,8 @@ class magikEspellCheck extends Syllabifier {
 
             pool.forEach((w) => {
 
-                if (this.foundCache.has(w) || !reg.test(w)) return;
+                if (outOfRange(w) || this.foundCache.has(w) || !reg.test(w))
+                    return;
 
                 let score = this.diffScoreStrings(ogWord, w);
 
@@ -1110,6 +1133,7 @@ class magikEspellCheck extends Syllabifier {
                 sugestions.push([w, score]);
 
             })
+
 
         })
 
@@ -1128,11 +1152,6 @@ class magikEspellCheck extends Syllabifier {
                 sugestions.push([test, this.diffScoreStrings(ogWord, test)]) &
                 this.foundCache.add(test) : null
 
-            //MAKIN VRS BY ADDING AN S
-            test = s[0] + "s";
-            !this.foundCache.has(test) && this.check(test) ?
-                sugestions.push([test, this.diffScoreStrings(ogWord, test)]) &
-                this.foundCache.add(test) : null
 
             //MAKING VRS BY DEL LAST CHAR
             test = s[0].slice(0, -1);
