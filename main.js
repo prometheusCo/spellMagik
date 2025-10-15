@@ -979,7 +979,8 @@ class magikEspellCheck extends Syllabifier {
                 _add(posiblePatterns, this.replaceCharAt(p, 2, v)) : null)
         });
 
-        return posiblePatterns;
+        //FINAL SYMBOLS CLEAN UP
+        return [...new Set(posiblePatterns.filter((p) => !/[§|~]/.test(p)))];
     }
 
     //
@@ -996,6 +997,7 @@ class magikEspellCheck extends Syllabifier {
             [...this.foundCache].map((s) => [s, this.diffScoreStrings(ogWord, s)]) :
             [];
 
+        console.log(patterns);
         patterns.some((_pattern) => {
 
             let ending = _pattern.split("}(")[1].split("(")[0];
