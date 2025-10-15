@@ -47,7 +47,7 @@ class coreMethods {
     epochs = 3;
 
     //  Minimum similarity to accept suggestion (0–1). Higher => stricter
-    stringDiff = 0.7;
+    stringDiff = 70;
 
 
     //  Cap on suggestions returned
@@ -249,51 +249,25 @@ class coreMethods {
     //
     //
 
-    // Weighted Levenshtein-like similarity with vowel/consonant wildcards.
-    // Returns a score in ~[0.1, 0.99]; higher means more similar.
-    diffScoreStrings(a, b, weights = { ins: 1, del: 1, sub: 0.7 }) {
+    // Adhoc method — same logic, faster: precompute sets and freqs, no regex, no joins
+    diffScoreStrings(str1, str2) {
 
-        const vowels = 'aeiouAEIOU';
-        const isVowel = c => vowels.includes(c);
-        const isConsonant = c => /^[b-df-hj-np-tv-z]$/i.test(c);
-        const eq = (x, y) => (
-            x === y ? true :
-                (x === this.vowelsWildcard && isVowel(y)) || (y === this.vowelsWildcard && isVowel(x)) ? true :
-                    (x === this.consonantssWildcard && isConsonant(y)) || (y === this.consonantssWildcard && isConsonant(x))
-        );
-
-        const m = a.length;
-        const n = b.length;
-        const [s, t] = m < n ? [a, b] : [b, a];
-        const rows = s.length + 1;
-        const cols = t.length + 1;
-
-        let prev = new Float32Array(cols);
-        let curr = new Float32Array(cols);
-
-        for (let j = 0; j < cols; j++) prev[j] = j * weights.ins;
-
-        for (let i = 1; i < rows; i++) {
-            curr[0] = i * weights.del;
-            const si = s[i - 1];
-            for (let j = 1; j < cols; j++) {
-                const tj = t[j - 1];
-                const cost = eq(si, tj) ? 0 : weights.sub;
-                const del = prev[j] + weights.del;
-                const ins = curr[j - 1] + weights.ins;
-                const sub = prev[j - 1] + cost;
-                curr[j] = Math.min(del, ins, sub);
-            }
-            [prev, curr] = [curr, prev];
-        }
-
-        const distance = prev[cols - 1];
-        const maxLen = Math.max(m, n) || 1;
-        const worst = maxLen * Math.max(weights.ins, weights.del, weights.sub);
-        const similarity = 1 - distance / worst;
-
-        return 0.1 + similarity * 0.89; // scaled 0.1–0.99
-    };
+        let a = [...str1], b = [...str2], tl = a.length + b.length, diff = 0
+        let loop = [a, b], done = new Set(), sets = [new Set(a), new Set(b)]
+        let freq = [Object.create(null), Object.create(null)]
+        for (let ch of a) freq[0][ch] = (freq[0][ch] || 0) + 1
+        for (let ch of b) freq[1][ch] = (freq[1][ch] || 0) + 1
+        loop.forEach((self, i) => self.forEach((ch) => {
+            let j = i ^ 1
+            if (done.has(ch)) return
+            if (!sets[j].has(ch)) { diff += 1; return }
+            let d = Math.abs((freq[i][ch] || 0) - (freq[j][ch] || 0))
+            if (!d) return
+            diff += d
+            done.add(ch)
+        }))
+        return ((tl - diff) / tl) * 100
+    }
 
 
     //
@@ -1141,7 +1115,7 @@ class magikEspellCheck extends Syllabifier {
 
         // CHEAP SUGGESTIONS ARE MADE OVER TOP OG SUGESTIONS
         // (CHEAPER THAT DOING OVER ALL RETURNED CANDIDATES)
-        sugestions = sugestions.sort((a, b) => b[1] - a[1])
+        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions)
 
         sugestions.forEach((s) => {
 
