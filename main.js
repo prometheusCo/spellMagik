@@ -604,7 +604,6 @@ class magikEspellCheck extends Syllabifier {
     }
 
 
-
     // To proper warm up JIT given words must be incorrect,
     // otherwise it wouldn't fully warm up
     // Also code is writen to work based on that basis
@@ -997,11 +996,13 @@ class magikEspellCheck extends Syllabifier {
     //   - similarity >= stringDiff
     // Deduplicates with foundCache, sorts by score desc, trims to maxNumSuggestions.
     //
+
     returnSuggestions(patterns, ogWord) {
 
         // PICKING UP ALREADY FORMED SUGGESTIONS FROM PREV STAGE
         // SOME PATTERNS ALREADY FORM A WORD AND NEED NO TESTING
         // SO ARE ELIMINATED FROM PATTERNS AND ADDED TO FINAL ARRAY
+
         let sugestions = this.foundCache.size > 0 ?
             [...this.foundCache].map((s) => [s, this.diffScoreStrings(ogWord, s)]) :
             [];
