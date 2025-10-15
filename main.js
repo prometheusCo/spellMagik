@@ -1034,16 +1034,17 @@ class magikEspellCheck extends Syllabifier {
 
         sugestions.forEach((s) => {
 
+            let test = s[0].slice(1);
             //MAKING VRS BY DEL FIRST CHAR
-            !this.foundCache.has(s[0].slice(1)) && this.check(s[0].slice(1)) ?
-                sugestions.push([s[0].slice(1), this.diffScoreStrings(ogWord, s[0].slice(1))]) &
-                this.foundCache.add(s[0].slice(1)) : null
+            !this.foundCache.has(test) && this.check(test) ?
+                sugestions.push([test, this.diffScoreStrings(ogWord, test)]) &
+                this.foundCache.add(test) : null
 
             //MAKIN VRS BY ADDING AN S
-            test = test;
-            !this.foundCache.hastest && this.checktest ?
-                sugestions.push([s[0] + "s", this.diffScoreStrings(ogWord, s[0] + "s")]) &
-                this.foundCache.addtest : null
+            test = s[0] + "s";
+            !this.foundCache.has(test) && this.check(test) ?
+                sugestions.push([test, this.diffScoreStrings(ogWord, test)]) &
+                this.foundCache.add(test) : null
         })
 
         sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
