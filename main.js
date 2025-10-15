@@ -251,7 +251,7 @@ class coreMethods {
 
     // Weighted Levenshtein-like similarity with vowel/consonant wildcards.
     // Returns a score in ~[0.1, 0.99]; higher means more similar.
-    diffScoreStrings(a, b, weights = { ins: 0.4, del: 0.7, sub: 1.5 }) {
+    diffScoreStrings(a, b, weights = { ins: 1, del: 1, sub: 0.7 }) {
 
         const vowels = 'aeiouAEIOU';
         const isVowel = c => vowels.includes(c);
@@ -735,8 +735,11 @@ class magikEspellCheck extends Syllabifier {
         let secondLevel = this.dictMapped.get(`${fc}`).get(`${f2c}`);
         let thirdLevel = secondLevel[2].get(`${f3c}`);
 
-        if (f3c.length < 3 || !thirdLevel)
+        if (f3c.length < 3)
             return secondLevel;
+
+        if (!thirdLevel)
+            return false;
 
         if (!thirdLevel[2].get(`${we}`))
             return thirdLevel;
@@ -834,7 +837,7 @@ class magikEspellCheck extends Syllabifier {
         if (minus <= 3) return prev;
 
         // PENALIZING BIGGER LENGTHS DIFF OVER SIMILAR ONES
-        return prev - (minus * (0.03));
+        return prev - (minus * (0.09));
     }
 
     //
@@ -915,14 +918,6 @@ class magikEspellCheck extends Syllabifier {
             this.noiseCache.add(p); return false;
         }
 
-        if (!!word) {
-
-            let firsLe = this.getEst(word[0]);
-            let firsLe2 = this.getEst(p[0]);
-
-            if (firsLe === "C" && firsLe2 === "C" && p[0] !== word[0])
-                return false;
-        }
 
         return true;
     }
@@ -983,7 +978,7 @@ class magikEspellCheck extends Syllabifier {
         const _add = (array, data) => {
 
             let ending = data.split("}(")[1].split("(")[0];
-            let noLength = data.indexOf("]{0,") >= 0;
+            let noLength = data.indexOf("]{0,0") >= 0;
 
             noLength && this.check(data.split("[a-")[0] + ending) ?
                 this.foundCache.add(data.split("[a-")[0] + ending)
@@ -1023,7 +1018,7 @@ class magikEspellCheck extends Syllabifier {
 
 
             // CREATING SWAPED FIRST 2 CHARS VRS
-            [...posiblePatterns].forEach((p) => _add(posiblePatterns, swapFirstTwo(p)));
+            [...posiblePatterns].forEach((p) => p.includes(start) ? _add(posiblePatterns, swapFirstTwo(p)) : null);
 
             //SANITY CHECK OF ONLY TWO CHARS STARTS
             [...posiblePatterns].forEach((p) => {
@@ -1054,6 +1049,7 @@ class magikEspellCheck extends Syllabifier {
                     _add(posiblePatterns, this.replaceCharAt(p, 2, v)) : null)
             });
 
+
             //FINAL SYMBOLS CLEAN UP
             return [...new Set(posiblePatterns.filter((p) => !/[§|~]/.test(p)))];
         }
@@ -1065,6 +1061,10 @@ class magikEspellCheck extends Syllabifier {
         this.findAltEnd(word).forEach((l) => {
             endVrs.push(end.replace(this.vowelsWildcard, l))
         });
+
+        // EASY CATCH
+        if (spell.check(word.slice(0, -1)))
+            this.foundCache.add(word.slice(0, -1))
 
         // ACCTUALLY EXPANDING ENDS
         let r = [];
@@ -1086,7 +1086,6 @@ class magikEspellCheck extends Syllabifier {
     //
 
     returnSuggestions(patterns, ogWord) {
-
 
         // PICKING UP ALREADY FORMED SUGGESTIONS FROM PREV STAGE
         // SOME PATTERNS ALREADY FORM A WORD AND NEED NO TESTING
@@ -1118,11 +1117,11 @@ class magikEspellCheck extends Syllabifier {
 
             //Normal pool + words ending in vowel or consonants that have the pattern `ending` at.(-2)
             // (this amplifies the search range a lot without costing much effort)
-            let pool = [...set[0], ...altSet];
+            let pool = [...set[0], ...altSet].filter((w) => !outOfRange(w));
 
             pool.forEach((w) => {
 
-                if (outOfRange(w) || this.foundCache.has(w) || !reg.test(w))
+                if (this.foundCache.has(w) || !reg.test(w))
                     return;
 
                 let score = this.diffScoreStrings(ogWord, w);
@@ -1142,7 +1141,7 @@ class magikEspellCheck extends Syllabifier {
 
         // CHEAP SUGGESTIONS ARE MADE OVER TOP OG SUGESTIONS
         // (CHEAPER THAT DOING OVER ALL RETURNED CANDIDATES)
-        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
+        sugestions = sugestions.sort((a, b) => b[1] - a[1])
 
         sugestions.forEach((s) => {
 
@@ -1160,7 +1159,7 @@ class magikEspellCheck extends Syllabifier {
                 this.foundCache.add(test) : null
         })
 
-        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
+        sugestions = sugestions.sort((a, b) => b[1] - a[1])
         return sugestions.map((s) => [this.addAccents(s[0]), s[1]]);
 
     }
