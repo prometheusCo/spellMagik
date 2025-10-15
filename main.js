@@ -138,10 +138,8 @@ class coreMethods {
     insertChar = (y, x, c) => y.slice(0, x + 1) + c + y.slice(x + 1);
     // Check if two-letter token is a Spanish digraph
     isTwoLettersSounds = ll => this.twoLettersSounds.has(ll);
-
     //
     normalize = s => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, (m, i, a) => (m === '\u0303' && /[nN]/.test(a[i - 1])) ? m : '').normalize('NFC').toLowerCase() : s;
-
     // Silent exec
     _null = a => a;
 
@@ -385,11 +383,11 @@ class coreMethodsExt extends coreMethods {
             return true;
 
         // If first 2 letters starts in forbiden chars or full word is a 2 chars forbiden type, then we return false
-        if (f2 === "cc" || word === "ch" || word === "rr" || word === "ll")
+        if (inValidStart || this.isTwoLettersSounds(word))
             return false;
 
         // If first 2 chars are common spanish 2 letters formed sounds or know 3 chars exceptions, then we return true
-        if (((f2 === "rr" || f2 === "ll" || f2 == "ch" || f2 === "ps") && word.length > 2) || f3 === "ciu" || f3 === "cie")
+        if ((this.isTwoLettersSounds(f2) && word.length > 2) || f3 === "ciu" || f3 === "cie")
             return true;
 
         // Otherwise, test cluster type against the correct 2C onset patterns
@@ -867,6 +865,10 @@ class magikEspellCheck extends Syllabifier {
     //   - ending wildcard alignment
     //
 
+
+    //
+    // Validates valid patterns so we can discard those that won't match 
+    // 
     isValidP(p) {
 
         if (!this.isValid(p) || this.noiseCache.has(p))
@@ -883,6 +885,8 @@ class magikEspellCheck extends Syllabifier {
         return true;
     }
 
+    // Generates posible patterns using posible starts vrs 
+    // & reg expressions
     generateMutations(word) {
 
         let candidate = this.splitInSyllables(word).join("").replaceAll(",", "");
@@ -900,6 +904,7 @@ class magikEspellCheck extends Syllabifier {
         let startVrs = [start], startVrs1 = [], startVrs2 = [];
         let f2cO = word.slice(0, 2);// first 2 chars from og word
 
+        // Check validity  of pattern before adding it to final array
         const _add = (array, data) => {
 
             let ending = data.split("}(")[1].split("(")[0];
@@ -926,8 +931,7 @@ class magikEspellCheck extends Syllabifier {
         }
 
         //
-        // EXPANDING PLACEHOLDERS TO INFERE  SEARCH POOL IF ANY
-        //
+        // EXPANDING PLACEHOLDERS IN START SO WE CAN GET PATTERN'S SET
 
         if (/[§|~]/.test(start)) {
 
@@ -989,7 +993,8 @@ class magikEspellCheck extends Syllabifier {
     returnSuggestions(patterns, ogWord) {
 
         let sugestions = this.foundCache.size > 0 ?
-            [...this.foundCache].map((s) => [s, this.diffScoreStrings(ogWord, s)]) : [];
+            [...this.foundCache].map((s) => [s, this.diffScoreStrings(ogWord, s)]) :
+            [];
 
         patterns.some((_pattern) => {
 
@@ -999,9 +1004,11 @@ class magikEspellCheck extends Syllabifier {
             if (!set) return;
 
             let reg = new RegExp(_pattern, "i");
-            let tinySet = this.getSet(_pattern)[0].filter((a) => a.at(-2) === ending)
+            let vowelsSet = this.getSet(_pattern)[0].filter((a) => a.at(-2) === ending)
 
-            let pool = [...set[0], ...tinySet];
+            //Normal pool + words ending in vowel that have the `ending` at.(-2)
+            // (this amplifies the search range a lot without costing much)
+            let pool = [...set[0], ...vowelsSet];
 
             pool.forEach((w) => {
 
@@ -1019,6 +1026,12 @@ class magikEspellCheck extends Syllabifier {
         })
 
         // BONNUSES CHEAP SUGGESTIONS 
+        // (LOW EFFORT VRS )
+
+        // CHEAP SUGGESTIONS ARE MADE OVER TOP OG SUGESTIONS
+        // (CHEAPER THAT DOING OVER ALL RETURNED CANDIDATES)
+        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
+
         sugestions.forEach((s) => {
 
             //MAKING VRS BY DEL FIRST CHAR
