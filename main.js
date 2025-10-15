@@ -940,8 +940,14 @@ class magikEspellCheck extends Syllabifier {
         }
 
         // ACTUALLY CREATING PATTERNS
-        posiblePatterns = startVrs.map((st) =>
-            st + "[a-zñ]" + `{${rest.length - 2 < 0 ? 0 : rest.length - 2},${rest.length + 2}}(${end}([aeiou])?)$`);
+        posiblePatterns = startVrs.map((st) => {
+
+            let altEnd = !vowels.has(end) ? `(${end}([aeiou])?)$` : `(${end}([^aeiou])?)$`;
+            let minLn = rest.length - 2 < 0 ? 0 : rest.length - 2;
+            let maxLen = rest.length + 2;
+
+            return st + "[a-zñ]" + `{${minLn},${maxLen}}${altEnd}`
+        });
 
         //HAVE WE SHOULDED USED OG 3 CHAR INSTEAD OF PATTERN RESULT
         [...posiblePatterns].forEach((p) => { _add(posiblePatterns, this.replaceCharAt(p, 2, f2cO[1])) });
@@ -993,6 +999,9 @@ class magikEspellCheck extends Syllabifier {
     //
     returnSuggestions(patterns, ogWord) {
 
+        // PICKING UP ALREADY FORMED SUGGESTIONS FROM PREV STAGE
+        // SOME PATTERNS ALREADY FORM A WORD AND NEED NO TESTING
+        // SO ARE ELIMINATED FROM PATTERNS AND ADDED TO FINAL ARRAY
         let sugestions = this.foundCache.size > 0 ?
             [...this.foundCache].map((s) => [s, this.diffScoreStrings(ogWord, s)]) :
             [];
@@ -1006,11 +1015,11 @@ class magikEspellCheck extends Syllabifier {
             if (!set) return;
 
             let reg = new RegExp(_pattern, "i");
-            let vowelsSet = this.getSet(_pattern)[0].filter((a) => a.at(-2) === ending)
+            let altSet = this.getSet(_pattern)[0].filter((a) => a.at(-2) === ending)
 
-            //Normal pool + words ending in vowel that have the `ending` at.(-2)
-            // (this amplifies the search range a lot without costing much)
-            let pool = [...set[0], ...vowelsSet];
+            //Normal pool + words ending in vowel or consonants that have the pattern `ending` at.(-2)
+            // (this amplifies the search range a lot without costing much effort)
+            let pool = [...set[0], ...altSet];
 
             pool.forEach((w) => {
 
