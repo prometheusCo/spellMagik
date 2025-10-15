@@ -790,7 +790,7 @@ class magikEspellCheck extends Syllabifier {
             return syllable[0] + this.vowelsWildcard + syllable[1];
 
         // IF ENDING IS INVALID...
-        if (!this.hasValidEnding(syllable) && this.getEst(syllable.slice(0, 2)))
+        if (!this.hasValidEnding(syllable) && this.getEst(syllable.slice(0, 2)) === "CC")
             return syllable + this.vowelsWildcard
 
 
