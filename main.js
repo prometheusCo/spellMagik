@@ -142,6 +142,8 @@ class coreMethods {
     normalize = s => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, (m, i, a) => (m === '\u0303' && /[nN]/.test(a[i - 1])) ? m : '').normalize('NFC').toLowerCase() : s;
     // Silent exec
     _null = a => a;
+    // helper
+    diffChars = (a, b) => [...new Set(a + b)].filter(c => a.includes(c) !== b.includes(c));
 
 
     //
@@ -789,7 +791,7 @@ class magikEspellCheck extends Syllabifier {
             return syllable[0] + this.vowelsWildcard + syllable[1];
 
         // IF ENDING IS INVALID...
-        if (!this.hasValidEnding(syllable) && this.getEst(syllable.slice(0, 2)) === "CC")
+        if (!this.hasValidEnding(syllable))
             return syllable + this.vowelsWildcard
 
 
@@ -802,6 +804,19 @@ class magikEspellCheck extends Syllabifier {
             return this.insertChar(syllable, 1, this.vowelsWildcard)
 
         return syllable;
+    }
+
+
+    // DIFF SCORE EXPANSION
+    diffScoreStrings(original, sustitute) {
+
+        let prev = super.diffScoreStrings(original, sustitute);
+        let minus = this.pos(original.length - sustitute.length);
+
+        if (minus <= 3) return prev;
+
+        // PENALIZING BIGGER LENGTHS DIFF OVER SIMILAR ONES
+        return prev - (minus * (0.03));
     }
 
     //
@@ -940,7 +955,6 @@ class magikEspellCheck extends Syllabifier {
 
             let ending = data.split("}(")[1].split("(")[0];
             let noLength = data.indexOf("]{0,") >= 0;
-            let f3c = data.slice(0, 3);
 
             noLength && this.check(data.split("[a-")[0] + ending) ?
                 this.foundCache.add(data.split("[a-")[0] + ending)
@@ -1098,6 +1112,12 @@ class magikEspellCheck extends Syllabifier {
 
             //MAKIN VRS BY ADDING AN S
             test = s[0] + "s";
+            !this.foundCache.has(test) && this.check(test) ?
+                sugestions.push([test, this.diffScoreStrings(ogWord, test)]) &
+                this.foundCache.add(test) : null
+
+            //MAKING VRS BY DEL LAST CHAR
+            test = s[0].slice(0, -1);
             !this.foundCache.has(test) && this.check(test) ?
                 sugestions.push([test, this.diffScoreStrings(ogWord, test)]) &
                 this.foundCache.add(test) : null
