@@ -1050,78 +1050,48 @@ class magikEspellCheck extends Syllabifier {
 
     }
 
+
     //
-    // correct(word, callBack?)
-    // Orchestrates the flow:
-    //   1) Wait until dictionary is ready (warm cache on first call if warmStart)
-    //   2) If the word is valid (exact match in its bucket), return true (synchronous)
-    //   3) Compute scored suggestions
-    //   4) If not warm-starting and callback exists, invoke callback(suggestions)
-    // Note:warmStart
-    //   - Uses a setInterval-based "waitTillReady" to keep a callback-style API (no Promises).
+    // Handles both synchronous and asynchronous (Promise-based)
+    // execution depending on dictionary readiness.
     //
 
     correct(word, callBack = false, silentExec = false) {
 
-        if (!this.ready && !callBack && !silentExec)
-            throw new Error("For no callback use, a dict must be ready first!");
+        const exec = () => {
 
-        let start = this.ready ? performance.now() : null;
-        let ogWord = word.toLowerCase();
-        let rInt; // use to clear callback int
-
-        //
-        // This helper sustitutes a promise paradigm for a callback return  paradigm, wich I preffer.
-        //
-        const waitTillReady = () => {
-            rInt = setInterval(() => { this.ready ? clearInterval(rInt) & run() : null }, 500)
-        }
-
-        // Main method code
-        const run = () => {
-
-            this.foundCache = new Set([]);
-            start = !this.isValid(start) && this.ready ? performance.now() : start;
+            this.foundCache = new Set();
+            let start = this.ready ? performance.now() : null;
+            const og = String(word).toLowerCase();
             word = this.normalize(word).toLowerCase();
 
-            // Returns true if correct (including accent), otherwise an array of suggestions.
-            //  
             if (this.check(word)) {
 
-                let r = [this.addAccents(word), 0.99];//Default accented ver if any
+                const accented = this.addAccents(word);
 
-                // If word is 100% ok we return true, if only lacks accents
-                // we return accented version as unique suggestion
-                r = (this.addAccents(word) !== ogWord) ? r : true;
-
-                // Returning either throught callback or direct return formula
-                if (!!callBack) r = callBack(r);
-                return r;
+                // true if perfectly correct; otherwise single accented suggestion
+                const out = accented !== og ? [accented, 0.99] : true;
+                return callBack ? callBack(out) : out;
             }
 
-            let mutations = this.generateMutations(word);
+            const suggestions = this.returnSuggestions([...this.generateMutations(word)], word);
 
-            let sugestions = this.returnSuggestions([...mutations], word);
-            this.isValid(start) && this.ready && !silentExec ?
+            this.ready && this.isValid(start) && !silentExec ?
                 this.printTime(start, " EXEC TIME", 10) : null;
 
-            if (this.ready && this.warmStart)
-                this.warmStart = false;
+            this.ready && this.warmStart ? (this.warmStart = false) : null;
+            return callBack ? callBack(suggestions) : suggestions;
+        };
 
-            if (!!callBack)
-                return callBack(sugestions);
+        const isReady = () => { this.ready ? (clearInterval(id), resolve(exec())) : null };
 
-            return sugestions;
-        }
+        return (silentExec || this.ready)
 
-        // THis and lines bellow could have been done in one if/else, but I prefer this style
-        // (I found it cleaner)
-        (!this.ready && !silentExec) ? waitTillReady() : null;
+            ? exec() : new Promise(resolve => {
+                const id = setInterval(() => (isReady(id)), 200);
+            });
 
-        if (this.ready || silentExec)
-            return run();
-    }
+    };
 
 }
-
 const spell = new magikEspellCheck();
