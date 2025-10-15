@@ -1040,9 +1040,10 @@ class magikEspellCheck extends Syllabifier {
                 this.foundCache.add(s[0].slice(1)) : null
 
             //MAKIN VRS BY ADDING AN S
-            !this.foundCache.has(s[0] + "s") && this.check(s[0] + "s") ?
+            test = test;
+            !this.foundCache.hastest && this.checktest ?
                 sugestions.push([s[0] + "s", this.diffScoreStrings(ogWord, s[0] + "s")]) &
-                this.foundCache.add(s[0] + "s") : null
+                this.foundCache.addtest : null
         })
 
         sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
