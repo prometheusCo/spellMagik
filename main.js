@@ -624,6 +624,23 @@ class magikEspellCheck extends Syllabifier {
         return results;
     };
 
+    sortDictTree() {
+
+        const sortArray = arr => arr.sort((a, b) => b.length - a.length);
+
+        this.dictMapped.forEach(f2Map => {
+            f2Map.forEach(([arr2, , f3Map]) => {
+                sortArray(arr2);
+
+                f3Map.forEach(([arr3, , weMap]) => {
+                    sortArray(arr3);
+
+                    weMap.forEach(([arr4]) => sortArray(arr4));
+                });
+            });
+        });
+    }
+
     //
     // Prepare dictionary:
     //   - Split CSV-like content
@@ -697,6 +714,7 @@ class magikEspellCheck extends Syllabifier {
         (!this.warmStart) ? this.ready = true :
             this.handleWarmStartAll().then(results => { console.log("warm up ready"); this.ready = true; });
 
+        this.sortDictTree();
         console.log("Dictionary fully loaded");
     }
 
