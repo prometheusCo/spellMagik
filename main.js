@@ -251,7 +251,7 @@ class coreMethods {
 
     // Weighted Levenshtein-like similarity with vowel/consonant wildcards.
     // Returns a score in ~[0.1, 0.99]; higher means more similar.
-    diffScoreStrings(a, b, weights = { ins: 0.7, del: 0.5, sub: 1.5 }) {
+    diffScoreStrings(a, b, weights = { ins: 0.4, del: 0.7, sub: 1.5 }) {
 
         const vowels = 'aeiouAEIOU';
         const isVowel = c => vowels.includes(c);
@@ -900,13 +900,29 @@ class magikEspellCheck extends Syllabifier {
         let startVrs = [start], startVrs1 = [], startVrs2 = [];
         let f2cO = word.slice(0, 2);// first 2 chars from og word
 
+        const _add = (array, data) => {
+
+            let ending = data.split("}(")[1].split("(")[0];
+            let noLength = data.indexOf("]{0,") >= 0;
+
+            noLength && this.check(data.split("[a-")[0] + ending) ?
+                this.foundCache.add(data.split("[a-")[0] + ending)
+                : null;
+
+            if (noLength || !this.isValidP(data))
+                return;
+
+            array.push(data);
+
+        }
+
         const opositeFill = (p, i) => {
 
             if (this.getEst(p[i]) === "C")
-                vowels.forEach((v) => posiblePatterns.push(v + this.replaceCharAt(p, 2, "")))
+                vowels.forEach((v) => _add(posiblePatterns, v + this.replaceCharAt(p, 2, "")))
 
             if (this.getEst(p[i]) === "V")
-                consonants.forEach((c) => posiblePatterns.push(c + this.replaceCharAt(p, 2, "")))
+                consonants.forEach((c) => _add(posiblePatterns, c + this.replaceCharAt(p, 2, "")))
         }
 
         //
@@ -924,19 +940,19 @@ class magikEspellCheck extends Syllabifier {
             st + "[a-zñ]" + `{${rest.length - 2 < 0 ? 0 : rest.length - 2},${rest.length + 2}}(${end}([aeiou])?)$`);
 
         //HAVE WE SHOULDED USED OG 3 CHAR INSTEAD OF PATTERN RESULT
-        [...posiblePatterns].forEach((p) => { posiblePatterns.push(this.replaceCharAt(p, 2, f2cO[1])) });
+        [...posiblePatterns].forEach((p) => { _add(posiblePatterns, this.replaceCharAt(p, 2, f2cO[1])) });
 
 
         // CREATING SWAPED FIRST 2 CHARS VRS
-        [...posiblePatterns].forEach((p) => posiblePatterns.push(swapFirstTwo(p)));
+        [...posiblePatterns].forEach((p) => _add(posiblePatterns, swapFirstTwo(p)));
 
         //SANITY CHECK OF ONLY TWO CHARS STARTS
         [...posiblePatterns].forEach((p) => {
 
             if (p[2] !== "[") return;
 
-            consonants.forEach((c) => posiblePatterns.push(p.replaceAll("[", `${c}[`)))
-            vowels.forEach((v) => posiblePatterns.push(p.replaceAll("[", `${v}[`)))
+            consonants.forEach((c) => _add(posiblePatterns, p.replaceAll("[", `${c}[`)))
+            vowels.forEach((v) => _add(posiblePatterns, p.replaceAll("[", `${v}[`)))
         });
 
 
@@ -953,15 +969,11 @@ class magikEspellCheck extends Syllabifier {
 
             // RE-EXPANDING ...
             consonants.forEach((c) => this.adjacentQwerty(c, p[2]) && this.isValidSyllable(c + p[2]) ?
-                posiblePatterns.push(this.replaceCharAt(p, 2, c)) : null)
+                _add(posiblePatterns, this.replaceCharAt(p, 2, c)) : null)
 
             vowels.forEach((v) => this.adjacentQwerty(v, p[2]) && this.isValidSyllable(v + p[2]) ?
-                posiblePatterns.push(this.replaceCharAt(p, 2, v)) : null)
+                _add(posiblePatterns, this.replaceCharAt(p, 2, v)) : null)
         });
-
-
-        // FINAL CLEAN UP
-        posiblePatterns = [...new Set(posiblePatterns.filter((p) => this.isValidP(p)))];
 
         return posiblePatterns;
     }
@@ -976,8 +988,8 @@ class magikEspellCheck extends Syllabifier {
     //
     returnSuggestions(patterns, ogWord) {
 
-        let foundCache = this.foundCache;
-        let sugestions = [];
+        let sugestions = this.foundCache.size > 0 ?
+            [...this.foundCache].map((s) => [s, this.diffScoreStrings(ogWord, s)]) : [];
 
         patterns.some((_pattern) => {
 
@@ -993,13 +1005,13 @@ class magikEspellCheck extends Syllabifier {
 
             pool.forEach((w) => {
 
-                if (foundCache.has(w) || !reg.test(w)) return;
+                if (this.foundCache.has(w) || !reg.test(w)) return;
 
                 let score = this.diffScoreStrings(ogWord, w);
 
                 if (score < this.stringDiff) return;
 
-                foundCache.add(w);
+                this.foundCache.add(w);
                 sugestions.push([w, score]);
 
             })
@@ -1010,14 +1022,14 @@ class magikEspellCheck extends Syllabifier {
         sugestions.forEach((s) => {
 
             //MAKING VRS BY DEL FIRST CHAR
-            !foundCache.has(s[0].slice(1)) && this.check(s[0].slice(1)) ?
+            !this.foundCache.has(s[0].slice(1)) && this.check(s[0].slice(1)) ?
                 sugestions.push([s[0].slice(1), this.diffScoreStrings(ogWord, s[0].slice(1))]) &
-                foundCache.add(s[0].slice(1)) : null
+                this.foundCache.add(s[0].slice(1)) : null
 
             //MAKIN VRS BY ADDING AN S
-            !foundCache.has(s[0] + "s") && this.check(s[0] + "s") ?
+            !this.foundCache.has(s[0] + "s") && this.check(s[0] + "s") ?
                 sugestions.push([s[0] + "s", this.diffScoreStrings(ogWord, s[0] + "s")]) &
-                foundCache.add(s[0] + "s") : null
+                this.foundCache.add(s[0] + "s") : null
         })
 
         sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
