@@ -4,6 +4,9 @@
 
 ### Heuristic Spell-Checker for Spanish — 100% Browser-Native
 
+### ATENTION: WORK IN PROGRESS, I TRY TO UPDATE IT EVERY DAY
+
+
 **magikEspellCheck** is a lightweight, dictionary-driven spell corrector designed for **modern browsers**.
 It uses **syllable-based heuristics** and **phonetic rules** of Spanish to detect and fix spelling errors, without needing any server or external library.
 
@@ -83,9 +86,10 @@ No Promises — pure callback flow.
 
 ## ⚡ Performance
 
-* 4 - level three LIKE dictionary index (`a → ab → abu → (abue..a) → [[words], Set(words)] `) for fast lookups.
+* 2 - level three LIKE dictionary index (`abu → (abue..a) → [pool] `) for fast lookups.
 * Typed arrays for fast edit-distance computation.
 * First call “warm-start” compiles hot paths for low latency later.
+* Avg suggestion look up is betwen 0.002 and 0.005 segs
 
 ---
 
