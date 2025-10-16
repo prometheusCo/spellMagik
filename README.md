@@ -78,9 +78,6 @@ spell.correct(word, callback)
   * generates candidates,
   * scores them, and
   * calls the callback with the top suggestions.
-  * or returns a promise for those cases when called
-  * when the dictionary was unloaded yet
-
 
 ---
 
