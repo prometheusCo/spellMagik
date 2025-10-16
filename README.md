@@ -68,7 +68,6 @@ You can adjust key parameters inside the class:
 spell.correct(word, callback)
 ```
 
-* Always waits until the dictionary is ready.
 * If the word is **valid**, it:
 
   * returns `true`, **and**
@@ -79,8 +78,9 @@ spell.correct(word, callback)
   * generates candidates,
   * scores them, and
   * calls the callback with the top suggestions.
+  * or returns a promise for those cases when called
+  * when the dictionary was unloaded yet
 
-No Promises — pure callback flow.
 
 ---
 
