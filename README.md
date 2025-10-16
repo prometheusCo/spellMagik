@@ -4,7 +4,7 @@
 
 ### Heuristic Spell-Checker for Spanish — 100% Browser-Native
 
-### ATENTION: WORK IN PROGRESS, I TRY TO UPDATE IT EVERY DAY
+### ATENTION: WORK IN PROGRESS, I'LL TRY TO UPDATE THIS IT EVERY DAY SO I CAN HAVE IT PROD READY SOON!!!
 
 
 **magikEspellCheck** is a lightweight, dictionary-driven spell corrector designed for **modern browsers**.
