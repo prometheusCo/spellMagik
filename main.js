@@ -664,7 +664,51 @@ class magikEspellCheck extends Syllabifier {
             this.handleWarmStartAll().then(results => { console.log("warm up ready"); this.ready = true; });
 
         console.log("Dictionary fully loaded");
+        this.sortPools();
+        this.indexLengthJumps();
+
     }
+
+
+    sortPools() {
+
+        this.dictMapped.forEach(firstLevel => {
+
+            firstLevel.forEach(bucket => {
+                const pool = bucket.get("pool");
+                if (!Array.isArray(pool) || pool.length === 0) return;
+
+                // Remove duplicates and sort by length (desc)
+                const cleaned = [...new Set(pool)].sort((a, b) => b.length - a.length);
+                bucket.set("pool", cleaned);
+            });
+        });
+    }
+
+    indexLengthJumps() {
+
+        this.dictMapped.forEach(firstLevel => {
+            firstLevel.forEach(bucket => {
+                const pool = bucket.get("pool");
+                const idx = bucket.get("index");
+
+                if (!idx || typeof idx.clear === "function") idx?.clear?.();
+
+                if (!Array.isArray(pool) || pool.length === 0) return;
+
+                let lastLen = -1;
+                for (let i = 0; i < pool.length; i++) {
+                    const len = pool[i].length;
+                    if (len !== lastLen) {
+                        idx.set(len, i);   // pointer to first item with this length
+                        lastLen = len;
+                    }
+                }
+            });
+        });
+    }
+
+
 
     //
     // Get Set of candidates sharing same first two chars, if legal.
@@ -828,14 +872,6 @@ class magikEspellCheck extends Syllabifier {
     }
 
 
-    //
-    // Generate length-/pattern-constrained regexes to probe dictionary buckets.
-    // Uses:
-    //   - onset alternatives (swap letters, fill wildcard with concrete vowels/consonants)
-    //   - middle-length ±1 tolerance
-    //   - ending wildcard alignment
-    //
-
 
 
     //
@@ -857,25 +893,28 @@ class magikEspellCheck extends Syllabifier {
     generateMutations(word) {
 
 
-        let f2cO = word.slice(0, 2);// first 2 chars from og word
         let candidate = this.splitInSyllables(word).join("").replaceAll(",", "");
         let posiblePatterns = [candidate];
         const vowels = [...this.vowels];
         const consonants = this.consonants;
+        let patternsDone = new Set();
 
         const wildcardsExpand = (candidate, toExpand, wildcard, toPush) => toPush.push(toExpand.map(v => candidate.replaceAll(wildcard, v)));
         const getVariants = s => [...new Set(s.split('').flatMap(a => s.split('').flatMap(b => s.split('').map(c => a + b + c))))];
 
         const patternHelper = (st, rest, end) => {
 
+            if (patternsDone.has(st)) return false;
+
             let altEnd = x => !this.vowels.has(x) ? `(${x}([aeiou])?)$` : `(${x}([^aeiou])?)$`;
             let minLn = rest.length - 2 < 0 ? 0 : rest.length - 2;
             let maxLen = rest.length + 2;
 
+            patternsDone.add(st);
             return [st + "[a-zñ]" + `{${minLn},${maxLen}}${altEnd(end)}`, [minLn, maxLen], end];
         }
 
-        let start = candidate.slice(0, 3);
+        let start = candidate.slice(0, 2);
         let end = candidate.slice(-1);
 
         let candidateVrsV = [], candidateVrsC = [];
@@ -895,9 +934,6 @@ class magikEspellCheck extends Syllabifier {
         // CLEANING
         posiblePatterns = posiblePatterns.filter((p) => !/[§|~]/.test(p));
 
-        //HAVE WE SHOULDED USED OG 3 CHAR INSTEAD OF PATTERN RESULT ???
-        posiblePatterns.push(this.replaceCharAt(posiblePatterns[0], 2, f2cO[1]))
-
         let validC = new Set();
         // FOR EACH POS CANDIDATE TESTING AND  REPAIRING WRONG STARs OR ENDs
         [...posiblePatterns].forEach((cand, index) => {
@@ -914,6 +950,9 @@ class magikEspellCheck extends Syllabifier {
 
             // is ending valid???
             let isValindEnding = starVrs.filter((sv) => !!this.getSet(sv)).length > 0;
+
+            // Filtering low quality star vrs
+            starVrs = starVrs.filter(vr => this.diffScoreStrings(start, vr.slice(0, 2)) >= this.stringDiff);
 
             // we got also a wrong ending
             starVrs.forEach((vr) => {
@@ -941,7 +980,7 @@ class magikEspellCheck extends Syllabifier {
 
         // ACCTUALLY CREATING MUTATIONS (  PATTERNS FOR POSIBLE WORDS )
         posiblePatterns = posiblePatterns.map((p) => patternHelper(p.slice(0, 3), p.slice(3, -1), p.slice(-1)));
-        return posiblePatterns;
+        return posiblePatterns.filter((p) => !!p);
 
     }
 
@@ -956,6 +995,8 @@ class magikEspellCheck extends Syllabifier {
     //
 
     returnSuggestions(patterns, ogWord) {
+
+        console.log(patterns);
 
         let sugestions = [];
         const sortAndCut = () => {
@@ -1004,6 +1045,7 @@ class magikEspellCheck extends Syllabifier {
             // (this amplifies the search range a lot without costing much effort)
             let pool = set.get(`pool`)
 
+            console.log(pool)
             pool.forEach((w) => {
 
                 if (this.foundCache.has(w) || !reg.test(w))
