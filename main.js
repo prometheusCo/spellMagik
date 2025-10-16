@@ -54,7 +54,7 @@ class coreMethods {
     maxNumSuggestions = 10;
 
     //  Warm-up run to avoid first-call latency
-    warmStart = true;
+    warmStart = false;
 
 
     //  Wildcard tokens used INSIDE candidate patterns:
@@ -505,7 +505,6 @@ class Syllabifier extends coreMethodsExt {
 
         let cut = Math.round(word.length / 2)
         return [word.slice(0, cut), word.slice(cut)];
-
     }
 
     //  
@@ -537,6 +536,7 @@ class Syllabifier extends coreMethodsExt {
         // Iterate letters; accumulate consonants; on vowel, push syllable (buffer + vowel).
         // After each push, run rule-based post-processing (rulesApply).
         //
+
         const end = wordAsArray.length - 1;
         for (let index = 0; index <= end; index++) {
 
@@ -645,6 +645,7 @@ class magikEspellCheck extends Syllabifier {
             // Get or create second level bucket
             let bucket = firstLevel.get(wEnd);
             if (!bucket) {
+
                 bucket = new Map();
                 bucket.set("pool", []);          // Pattern-like searches
                 bucket.set("poolS", new Set());  // Fast presence checks
@@ -672,6 +673,7 @@ class magikEspellCheck extends Syllabifier {
     // Get Set of candidates sharing same first two chars, if legal.
     // Returns Set<string> or false if missing/illegal prefix.
     //
+
     getSet(word, wEnd = false) {
 
         const f3c = word.slice(0, 3);
@@ -685,7 +687,6 @@ class magikEspellCheck extends Syllabifier {
 
         return secondLevel;
     }
-
 
     //
     // Check:
@@ -826,7 +827,6 @@ class magikEspellCheck extends Syllabifier {
             epochs++;
 
         }
-
         return syllables;
     }
 
@@ -840,44 +840,17 @@ class magikEspellCheck extends Syllabifier {
     //
 
 
-    //
-    // Validates valid patterns so we can discard those that won't match 
-    // 
-    isValidP(p, word = false) {
-
-        if (!this.isValid(p) || this.noiseCache.has(p))
-            return false;
-
-        let set = this.getSet(p.slice(0, 3));
-        if (!set || !this.isF2Valid(p.slice(0, 2)) || p[3] !== "[") {
-            this.noiseCache.add(p); return false;
-        }
-
-        if (set.get(`pool`)[0][2] !== p[2]) {
-            this.noiseCache.add(p); return false;
-        }
-
-
-        return true;
-    }
 
     //
     // SEARCH ADY CHARS IN QWERTY KEYBOARD
     adjacentQwertyFind(key) {
-
-        let letters = [
-            'a', 'e', 'i', 'o', 'u', 'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm',
-            'n', 'ñ', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z'
-        ]
-
-        return letters.filter((l) => this.adjacentQwerty(key, l));
+        return [...this.vowels, ...this.consonants].filter((l) => this.adjacentQwerty(key, l));
     }
 
     findAltEnd(w) {
 
         let a = w.slice(-2, 1);
         let b = w.slice(-1);
-
         return this.adjacentQwertyFind(b).filter((s) => this.isValidSyllable(a + s));
     }
 
@@ -888,12 +861,16 @@ class magikEspellCheck extends Syllabifier {
 
 
         let candidate = this.splitInSyllables(word).join("").replaceAll(",", "");
-        let posiblePatterns = [];
-        const vowels = this.vowels;
-        const swapFirstTwo = s => s.length < 2 ? s : s[1] + s[0] + s.slice(2);
+        let posiblePatterns = [candidate];
+        const vowels = [...this.vowels];
+        const consonants = this.consonants;
+
+        const wildcardsExpand = (candidate, toExpand, wildcard, toPush) => toPush.push(toExpand.map(v => candidate.replaceAll(wildcard, v)));
+        const getVariants = s => [...new Set(s.split('').flatMap(a => s.split('').flatMap(b => s.split('').map(c => a + b + c))))];
+
         const patternHelper = (st, rest, end) => {
 
-            let altEnd = x => !vowels.has(x) ? `(${x}([aeiou])?)$` : `(${x}([^aeiou])?)$`;
+            let altEnd = x => !this.vowels.has(x) ? `(${x}([aeiou])?)$` : `(${x}([^aeiou])?)$`;
             let minLn = rest.length - 2 < 0 ? 0 : rest.length - 2;
             let maxLen = rest.length + 2;
 
@@ -901,115 +878,69 @@ class magikEspellCheck extends Syllabifier {
         }
 
         let start = candidate.slice(0, 3);
-        let rest = candidate.length > 3 ? candidate.slice(3) : "";
-        let end = candidate.length > 3 ? candidate.slice(-1) : "";
-        let startVrs = [start], startVrs1 = [], startVrs2 = [];
-        let f2cO = word.slice(0, 2);// first 2 chars from og word
-        // EXPANDING ENDS TOO (JUST IN CASES WHEN ENDS ARE REALLY NEEDED TO EXPAND)
-        let endVrs = [];
+        let end = candidate.slice(-1);
 
+        let candidateVrsV = [], candidateVrsC = [];
+        let starVrs = [], endVrs = [];
 
-        // Check validity  of pattern before adding it to final array
-        const _add = (array, data) => {
+        // EXPANDING WILCARDS TO ACCTUAL POS WORDS IF ANY
+        /§/.test(candidate) ?
+            wildcardsExpand(candidate, vowels, this.vowelsWildcard, candidateVrsV)
+            : null;
 
-            let ending = data.split("}(")[1].split("(")[0];
-            let noLength = data.indexOf("]{0,0") >= 0;
+        /~/.test(candidate) ?
+            wildcardsExpand(candidate, consonants, this.vowelsWildcard, candidateVrsC)
+            : null;
 
-            noLength && this.check(data.split("[a-")[0] + ending) ?
-                this.foundCache.add(data.split("[a-")[0] + ending)
-                : null;
+        posiblePatterns = [...posiblePatterns, ...candidateVrsV[0] ?? [], ...candidateVrsC[0] ?? []];
+        posiblePatterns = posiblePatterns.filter((p) => !/[§|~]/.test(p));
 
-            if (noLength || !this.isValidP(data, word))
-                return;
+        let validC = new Set();
+        // FOR EACH POS CANDIDATE TESTING AND  REPAIRING WRONG STARs OR ENDs
+        [...posiblePatterns].forEach((cand, index) => {
 
-            array.push(data);
-        }
+            if (!!this.getSet(cand))
+                return true;
 
-        const opositeFill = (p, i) => {
-
-            if (this.getEst(p[i]) === "C")
-                vowels.forEach((v) => _add(posiblePatterns, v + this.replaceCharAt(p, 2, "")))
-
-            if (this.getEst(p[i]) === "V")
-                this.consonants.forEach((c) => _add(posiblePatterns, c + this.replaceCharAt(p, 2, "")))
-        }
-
-        const run = () => {
-
-            //
-            // EXPANDING PLACEHOLDERS IN START SO WE CAN GET PATTERN'S SET
-
-            if (/[§|~]/.test(start)) {
-
-                vowels.forEach((l) => { startVrs.push(start.replace(this.vowelsWildcard, l)) })
-                this.consonants.forEach((l) => { startVrs.push(start.replace(this.consonantssWildcard, l)) })
+            starVrs = getVariants(cand.slice(0, 3)).filter((st) => !!spell.dictMapped.get(`${st}`));
+            {
+                posiblePatterns.splice(index, 1);
+                starVrs = starVrs.map((st) => st + cand.slice(3));
+                starVrs.unshift(cand.slice(0, 3) + cand.slice(3));
             }
 
-            // ACTUALLY CREATING PATTERNS
-            posiblePatterns = startVrs.map((st) => patternHelper(st, rest, end));
+            // is ending valid???
+            let isValindEnding = starVrs.filter((sv) => !!this.getSet(sv)).length > 0;
 
-            //HAVE WE SHOULDED USED OG 3 CHAR INSTEAD OF PATTERN RESULT
-            [...posiblePatterns].forEach((p) => { _add(posiblePatterns, this.replaceCharAt(p, 2, f2cO[1])) });
+            // we got also a wrong ending
+            starVrs.forEach((vr) => {
 
+                let pValidC = (vr.slice(0, 3) + "::" + vr.slice(-1));
 
-            // CREATING SWAPED FIRST 2 CHARS VRS
-            [...posiblePatterns].forEach((p) => p.includes(start) ? _add(posiblePatterns, swapFirstTwo(p)) : null);
+                if (validC.has(pValidC)) return;
+                [...consonants, ...vowels].forEach((l) => {
 
-            //SANITY CHECK OF ONLY TWO CHARS STARTS
-            [...posiblePatterns].forEach((p) => {
+                    let test = vr.slice(0, -1) + l;
+                    let isValidSet = !!this.getSet(test);
+                    pValidC = isValidSet ? (vr.slice(0, 3) + "::" + l) : pValidC;
 
-                if (p[2] !== "[") return;
+                    if (validC.has(pValidC) || !this.adjacentQwerty(l, vr.slice(-1)))
+                        return;
 
-                this.consonants.forEach((c) => _add(posiblePatterns, p.replaceAll("[", `${c}[`)))
-                vowels.forEach((v) => _add(posiblePatterns, p.replaceAll("[", `${v}[`)))
+                    !isValindEnding ?
+                        (isValidSet ? posiblePatterns.push(test) : null) : (posiblePatterns.push(vr));
+
+                    validC.add(pValidC);
+                })
             });
 
+        })
 
-            //ADDING C OR V ACORDINGLY IN EACH CASE 
-            if (!/[§|~]/.test(candidate.slice(0, 2))) {
-                [...posiblePatterns].forEach((p) => { opositeFill(p, 0); })
-            }
-
-            // SANITY CHECK ADDING FOR INVALID P[1] + P[2] SYLLABLES
-            [...posiblePatterns].forEach((p) => {
-
-                if (this.isValidSyllable(p[1] + p[2]))
-                    return;
-
-                // RE-EXPANDING ...
-                this.consonants.forEach((c) => this.adjacentQwerty(c, p[2]) && this.isValidSyllable(c + p[2]) ?
-                    _add(posiblePatterns, this.replaceCharAt(p, 2, c)) : null)
-
-                vowels.forEach((v) => this.adjacentQwerty(v, p[2]) && this.isValidSyllable(v + p[2]) ?
-                    _add(posiblePatterns, this.replaceCharAt(p, 2, v)) : null)
-            });
-
-
-            //FINAL SYMBOLS CLEAN UP
-            return [...new Set(posiblePatterns.filter((p) => !/[§|~]/.test(p)))];
-        }
-
-        // MAIN LOGIC CODE
-        if (!/[§|~]/.test(end))
-            return run();
-
-        this.findAltEnd(word).forEach((l) => {
-            endVrs.push(end.replace(this.vowelsWildcard, l))
-        });
-
-        // EASY CATCH
-        if (spell.check(word.slice(0, -1)))
-            this.foundCache.add(word.slice(0, -1))
-
-        // ACCTUALLY EXPANDING ENDS
-        let r = [];
-        endVrs.forEach((_end) => {
-            if (!this.isValid(_end)) return; end = _end; r = [...r, ...run()];
-        });
-
-        return [...new Set(r.filter((p) => !/[§|~]/.test(p)))];
+        posiblePatterns = posiblePatterns.map((p) => patternHelper(p.slice(0, 3), p.slice(3, -1), p.slice(-1)));
+        return posiblePatterns;
 
     }
+
 
     //
     // Given mutation regexes and the original word, scan matching bucket and score candidates.
@@ -1022,22 +953,16 @@ class magikEspellCheck extends Syllabifier {
 
     returnSuggestions(patterns, ogWord) {
 
-        // PICKING UP ALREADY FORMED SUGGESTIONS FROM PREV STAGE
-        // SOME PATTERNS ALREADY FORM A WORD AND NEED NO TESTING
-        // SO ARE ELIMINATED FROM PATTERNS AND ADDED TO FINAL ARRAY
-
-        let sugestions = this.foundCache.size > 0 ?
-            [...this.foundCache].map((s) => [s, this.diffScoreStrings(ogWord, s)]) :
-            [];
+        let sugestions = [];
+        const sortAndCut = () => {
+            return sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
+        }
 
         const makeBonusesSuggestions = () => {
 
-            // BONNUSES CHEAP SUGGESTIONS 
-            // (LOW EFFORT VRS )
-
             // CHEAP SUGGESTIONS ARE MADE OVER TOP OG SUGESTIONS
             // (CHEAPER THAT DOING OVER ALL RETURNED CANDIDATES)
-            sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions)
+            sortAndCut();
 
             // Common helper to try a variant and add it if valid
             const addVariant = (base, make) => {
@@ -1089,13 +1014,11 @@ class magikEspellCheck extends Syllabifier {
 
             })
 
-
         })
 
         makeBonusesSuggestions();
-        sugestions = sugestions.map((s) => [this.addAccents(s[0]), s[1]]);
-        return sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
-
+        sortAndCut();
+        return sugestions;
     }
 
 
