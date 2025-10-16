@@ -905,7 +905,7 @@ class magikEspellCheck extends Syllabifier {
             if (!!this.getSet(cand))
                 return true;
 
-            starVrs = getVariants(cand.slice(0, 3)).filter((st) => !!spell.dictMapped.get(`${st}`));
+            starVrs = getVariants(cand.slice(0, 3)).filter((st) => !!this.dictMapped.get(`${st}`));
             {
                 posiblePatterns.splice(index, 1);
                 starVrs = starVrs.map((st) => st + cand.slice(3));
