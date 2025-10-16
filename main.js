@@ -860,6 +860,7 @@ class magikEspellCheck extends Syllabifier {
     generateMutations(word) {
 
 
+        let f2cO = word.slice(0, 2);// first 2 chars from og word
         let candidate = this.splitInSyllables(word).join("").replaceAll(",", "");
         let posiblePatterns = [candidate];
         const vowels = [...this.vowels];
@@ -874,14 +875,15 @@ class magikEspellCheck extends Syllabifier {
             let minLn = rest.length - 2 < 0 ? 0 : rest.length - 2;
             let maxLen = rest.length + 2;
 
-            return st + "[a-zñ]" + `{${minLn},${maxLen}}${altEnd(end)}`;
+            return [st + "[a-zñ]" + `{${minLn},${maxLen}}${altEnd(end)}`, [minLn, maxLen], end];
         }
 
         let start = candidate.slice(0, 3);
         let end = candidate.slice(-1);
 
         let candidateVrsV = [], candidateVrsC = [];
-        let starVrs = [], endVrs = [];
+        let starVrs = [];
+
 
         // EXPANDING WILCARDS TO ACCTUAL POS WORDS IF ANY
         /§/.test(candidate) ?
@@ -893,7 +895,11 @@ class magikEspellCheck extends Syllabifier {
             : null;
 
         posiblePatterns = [...posiblePatterns, ...candidateVrsV[0] ?? [], ...candidateVrsC[0] ?? []];
+        // CLEANING
         posiblePatterns = posiblePatterns.filter((p) => !/[§|~]/.test(p));
+
+        //HAVE WE SHOULDED USED OG 3 CHAR INSTEAD OF PATTERN RESULT ???
+        posiblePatterns.push(this.replaceCharAt(posiblePatterns[0], 2, f2cO[1]))
 
         let validC = new Set();
         // FOR EACH POS CANDIDATE TESTING AND  REPAIRING WRONG STARs OR ENDs
@@ -934,8 +940,9 @@ class magikEspellCheck extends Syllabifier {
                 })
             });
 
-        })
+        });
 
+        // ACCTUALLY CREATING MUTATIONS (  PATTERNS FOR POSIBLE WORDS )
         posiblePatterns = posiblePatterns.map((p) => patternHelper(p.slice(0, 3), p.slice(3, -1), p.slice(-1)));
         return posiblePatterns;
 
@@ -984,21 +991,21 @@ class magikEspellCheck extends Syllabifier {
 
         }
 
+
         //
         // MAIN  SEARCH LOOP
         //
         patterns.some((_pattern) => {
 
-            let ending = _pattern.split("}(")[1].split("(")[0] ?? "";
-            let set = this.getSet(_pattern, ending);
-
+            const [pattern, range, ending] = _pattern;
+            let set = this.getSet(pattern.slice(0, 3), ending);
             if (!set) return;
 
-            let reg = new RegExp(_pattern, "i");
+            let reg = new RegExp(pattern, "i");
 
             //Normal pool + words ending in vowel or consonants that have the pattern `ending` at.(-2)
             // (this amplifies the search range a lot without costing much effort)
-            let pool = [...set.get(`pool`)]
+            let pool = set.get(`pool`)
 
             pool.forEach((w) => {
 
@@ -1017,8 +1024,7 @@ class magikEspellCheck extends Syllabifier {
         })
 
         makeBonusesSuggestions();
-        sortAndCut();
-        return sugestions;
+        return sortAndCut(sugestions);
     }
 
 
