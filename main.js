@@ -356,9 +356,6 @@ class coreMethodsExt extends coreMethods {
         let estS = this.getEst(word, "string").slice(0, 2);
         let inValidStart = this.invalidStarts.has(f2);
 
-        if (inValidStart)
-            return false;
-
         // Early return for easy cases: CV or VC is always ok for the first two slots
         if (estS === "CV" || estS == "VC")
             return true;
@@ -844,7 +841,7 @@ class magikEspellCheck extends Syllabifier {
     //
     // SEARCH ADY CHARS IN QWERTY KEYBOARD
     adjacentQwertyFind(key) {
-        return [...this.vowels, ...this.consonants].filter((l) => this.adjacentQwerty(key, l));
+        return [...this.vowels.filter((v) => v !== this.vowelsWildcard), ...this.consonants].filter((l) => this.adjacentQwerty(key, l));
     }
 
     findAltEnd(w) {
@@ -891,7 +888,7 @@ class magikEspellCheck extends Syllabifier {
             : null;
 
         /~/.test(candidate) ?
-            wildcardsExpand(candidate, consonants, this.vowelsWildcard, candidateVrsC)
+            wildcardsExpand(candidate, consonants, this.consonantssWildcard, candidateVrsC)
             : null;
 
         posiblePatterns = [...posiblePatterns, ...candidateVrsV[0] ?? [], ...candidateVrsC[0] ?? []];
