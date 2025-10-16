@@ -67,6 +67,11 @@ class coreMethods {
     //
     //
 
+    consonants = [
+        'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm',
+        'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z', 'ñ'
+    ]
+
     // Vowels used for syllabification and others checks 
     weakVowels = ['i', 'u'];
     strongVowels = ['a', 'e', 'o']
@@ -598,22 +603,6 @@ class magikEspellCheck extends Syllabifier {
         return results;
     };
 
-    sortDictTree() {
-
-        const sortArray = arr => arr.sort((a, b) => b.length - a.length);
-
-        this.dictMapped.forEach(f2Map => {
-            f2Map.forEach(([arr2, , f3Map]) => {
-                sortArray(arr2);
-
-                f3Map.forEach(([arr3, , weMap]) => {
-                    sortArray(arr3);
-
-                    weMap.forEach(([arr4]) => sortArray(arr4));
-                });
-            });
-        });
-    }
 
     //
     // Prepare dictionary:
@@ -625,61 +614,49 @@ class magikEspellCheck extends Syllabifier {
 
     prepareDict() {
 
-        this.dictData = this.dictData.split(",");
+        // Ensure sources are initialized
+        if (typeof this.dictData === "string") this.dictData = this.dictData.split(",");
+        if (!this.dictMapped) this.dictMapped = new Map();
+        if (!this.accentedWords) this.accentedWords = new Map();
 
-        this.dictData.forEach((word) => {
+        this.dictData.forEach((raw) => {
 
-            let ogWord = word.toLowerCase();
-            word = this.normalize(word);
+            if (!this.isValid(raw)) return;
 
-            const fc = word.slice(0, 1).toLowerCase();
-            const f2c = word.slice(0, 2).toLowerCase();
-            const f3c = word.slice(0, 3).toLowerCase();
-            const we = word.slice(-1);
+            const original = String(raw);
+            const normalized = this.normalize(original).toLowerCase();
 
-            // For accents handling
-            /[à-ÿ]/i.test(ogWord) ? this.accentedWords.set(`${word}`, ogWord) : null;
+            // Accent bookkeeping (optional overwrite behavior kept as-is)
+            if (/[à-ÿ]/i.test(original)) this.accentedWords.set(normalized, original);
 
+            // Skip very short tokens; avoid creating half-built buckets
+            if (normalized.length < 3) return;
 
-            // If first level (a, b ,c ... [first letter]) is undef for this word, we make it
-            if (!this.dictMapped.has(`${fc}`))
-                this.dictMapped.set(`${fc}`, new Map());
+            const f3c = normalized.slice(0, 3);
+            const wEnd = normalized.slice(-1);
 
-            // If second level is also undef we made it
-            if (!this.dictMapped.get(`${fc}`).has(`${f2c}`))
-                this.dictMapped.get(`${fc}`).set(`${f2c}`, [[], new Set(), new Map()])
+            // Get or create first level
+            let firstLevel = this.dictMapped.get(f3c);
+            if (!firstLevel) {
+                firstLevel = new Map();
+                this.dictMapped.set(f3c, firstLevel);
+            }
 
-            // If third level...
-            if (!this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].has(`${f3c}`))
-                this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].set(`${f3c}`, [[], new Set(), new Map()]);
+            // Get or create second level bucket
+            let bucket = firstLevel.get(wEnd);
+            if (!bucket) {
+                bucket = new Map();
+                bucket.set("pool", []);          // Pattern-like searches
+                bucket.set("poolS", new Set());  // Fast presence checks
+                bucket.set("index", new Map());  // Length pointers for pool
+                firstLevel.set(wEnd, bucket);
+            }
 
-            // If 4th level...
-            if (!this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${we}`))
-                this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].set(`${we}`, [[], new Set()]);
+            // Insert word
+            bucket.get("pool").push(normalized);
+            bucket.get("poolS").add(normalized);
+        });
 
-
-            //Storing word in levels acording word's deep
-            //
-            // Storing word in second level by default
-            this.dictMapped.get(`${fc}`).get(`${f2c}`)[0].push(word);
-            this.dictMapped.get(`${fc}`).get(`${f2c}`)[1].add(word);
-
-
-            //If there's no third level we skiped the rest...
-            if (f3c.length < 3)
-                return;
-
-            // Storing word in third level 
-            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[0].push(word);
-            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[1].add(word);
-
-
-            // Storing word in 4th level 
-            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${we}`)[0].push(word);
-            this.dictMapped.get(`${fc}`).get(`${f2c}`)[2].get(`${f3c}`)[2].get(`${we}`)[1].add(word);
-
-
-        })
 
         // Used for detect acccented words and correct them
         this.accentedWordsSet = new Set([... this.dictData.filter((w) => /[à-ÿ]/i.test(w))].map((w) => this.normalize(w)));
@@ -688,7 +665,6 @@ class magikEspellCheck extends Syllabifier {
         (!this.warmStart) ? this.ready = true :
             this.handleWarmStartAll().then(results => { console.log("warm up ready"); this.ready = true; });
 
-        this.sortDictTree();
         console.log("Dictionary fully loaded");
     }
 
@@ -696,29 +672,18 @@ class magikEspellCheck extends Syllabifier {
     // Get Set of candidates sharing same first two chars, if legal.
     // Returns Set<string> or false if missing/illegal prefix.
     //
-    getSet(word, we = false) {
+    getSet(word, wEnd = false) {
 
-        const fc = word.slice(0, 1);
-        const f2c = word.slice(0, 2);
         const f3c = word.slice(0, 3);
-        we = !we ? word.slice(-1) : we;
+        wEnd = !wEnd ? word.slice(-1) : wEnd;
 
-        if (!this.dictMapped.get(`${fc}`) || !this.dictMapped.get(`${fc}`).get(`${f2c}`))
-            return false;
+        let firstLevel = this.dictMapped.get(`${f3c}`);
+        if (!firstLevel) return false;
 
-        let secondLevel = this.dictMapped.get(`${fc}`).get(`${f2c}`);
-        let thirdLevel = secondLevel[2].get(`${f3c}`);
+        let secondLevel = firstLevel.get(`${wEnd}`);
+        if (!secondLevel) return false;
 
-        if (f3c.length < 3)
-            return secondLevel;
-
-        if (!thirdLevel)
-            return false;
-
-        if (!thirdLevel[2].get(`${we}`))
-            return thirdLevel;
-
-        return thirdLevel[2].get(`${we}`);
+        return secondLevel;
     }
 
 
@@ -750,7 +715,7 @@ class magikEspellCheck extends Syllabifier {
         }
 
         let set = this.getSet(word);
-        if (!set || !set[1].has(word))
+        if (!set || !set.get(`poolS`).has(word))
             return false;
 
         return true;
@@ -888,7 +853,7 @@ class magikEspellCheck extends Syllabifier {
             this.noiseCache.add(p); return false;
         }
 
-        if (set[0][0][2] !== p[2]) {
+        if (set.get(`pool`)[0][2] !== p[2]) {
             this.noiseCache.add(p); return false;
         }
 
@@ -925,10 +890,6 @@ class magikEspellCheck extends Syllabifier {
         let candidate = this.splitInSyllables(word).join("").replaceAll(",", "");
         let posiblePatterns = [];
         const vowels = this.vowels;
-        const consonants = [
-            'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm',
-            'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z', 'ñ'
-        ]
         const swapFirstTwo = s => s.length < 2 ? s : s[1] + s[0] + s.slice(2);
         const patternHelper = (st, rest, end) => {
 
@@ -970,7 +931,7 @@ class magikEspellCheck extends Syllabifier {
                 vowels.forEach((v) => _add(posiblePatterns, v + this.replaceCharAt(p, 2, "")))
 
             if (this.getEst(p[i]) === "V")
-                consonants.forEach((c) => _add(posiblePatterns, c + this.replaceCharAt(p, 2, "")))
+                this.consonants.forEach((c) => _add(posiblePatterns, c + this.replaceCharAt(p, 2, "")))
         }
 
         const run = () => {
@@ -981,7 +942,7 @@ class magikEspellCheck extends Syllabifier {
             if (/[§|~]/.test(start)) {
 
                 vowels.forEach((l) => { startVrs.push(start.replace(this.vowelsWildcard, l)) })
-                consonants.forEach((l) => { startVrs.push(start.replace(this.consonantssWildcard, l)) })
+                this.consonants.forEach((l) => { startVrs.push(start.replace(this.consonantssWildcard, l)) })
             }
 
             // ACTUALLY CREATING PATTERNS
@@ -999,7 +960,7 @@ class magikEspellCheck extends Syllabifier {
 
                 if (p[2] !== "[") return;
 
-                consonants.forEach((c) => _add(posiblePatterns, p.replaceAll("[", `${c}[`)))
+                this.consonants.forEach((c) => _add(posiblePatterns, p.replaceAll("[", `${c}[`)))
                 vowels.forEach((v) => _add(posiblePatterns, p.replaceAll("[", `${v}[`)))
             });
 
@@ -1016,7 +977,7 @@ class magikEspellCheck extends Syllabifier {
                     return;
 
                 // RE-EXPANDING ...
-                consonants.forEach((c) => this.adjacentQwerty(c, p[2]) && this.isValidSyllable(c + p[2]) ?
+                this.consonants.forEach((c) => this.adjacentQwerty(c, p[2]) && this.isValidSyllable(c + p[2]) ?
                     _add(posiblePatterns, this.replaceCharAt(p, 2, c)) : null)
 
                 vowels.forEach((v) => this.adjacentQwerty(v, p[2]) && this.isValidSyllable(v + p[2]) ?
@@ -1069,29 +1030,50 @@ class magikEspellCheck extends Syllabifier {
             [...this.foundCache].map((s) => [s, this.diffScoreStrings(ogWord, s)]) :
             [];
 
+        const makeBonusesSuggestions = () => {
+
+            // BONNUSES CHEAP SUGGESTIONS 
+            // (LOW EFFORT VRS )
+
+            // CHEAP SUGGESTIONS ARE MADE OVER TOP OG SUGESTIONS
+            // (CHEAPER THAT DOING OVER ALL RETURNED CANDIDATES)
+            sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions)
+
+            // Common helper to try a variant and add it if valid
+            const addVariant = (base, make) => {
+
+                const test = make(base);
+                return (!this.foundCache.has(test) && this.check(test))
+                    ? (sugestions.push([test, this.diffScoreStrings(ogWord, test)]), this.foundCache.add(test), true)
+                    : false; // early return, no side effects if invalid
+            };
+
+            sugestions.forEach(s => {
+                const base = s[0];
+
+                addVariant(base, w => w.slice(1));     // delete first char
+                addVariant(base, w => w.slice(0, -1)); // delete last char
+                //Ading letters at word's end
+                [...this.vowels, ...this.consonants].forEach((l) => { addVariant(base, w => w + l); })
+            });
+
+        }
+
+        //
+        // MAIN  SEARCH LOOP
+        //
         patterns.some((_pattern) => {
 
             let ending = _pattern.split("}(")[1].split("(")[0] ?? "";
             let set = this.getSet(_pattern, ending);
-            let range = _pattern.split("]{")[1].split("}")[0].split(",") ?? false;
-
-            const outOfRange = (w) => {
-
-                w = w.length - 4;
-                if (!range) return false;
-                if (w > range[1] || w < range[0]) return true;
-
-                return false;
-            };
 
             if (!set) return;
 
             let reg = new RegExp(_pattern, "i");
-            let altSet = this.getSet(_pattern)[0].filter((a) => a.at(-2) === ending)
 
             //Normal pool + words ending in vowel or consonants that have the pattern `ending` at.(-2)
             // (this amplifies the search range a lot without costing much effort)
-            let pool = [...set[0], ...altSet].filter((w) => !outOfRange(w));
+            let pool = [...set.get(`pool`)]
 
             pool.forEach((w) => {
 
@@ -1110,31 +1092,9 @@ class magikEspellCheck extends Syllabifier {
 
         })
 
-        // BONNUSES CHEAP SUGGESTIONS 
-        // (LOW EFFORT VRS )
-
-        // CHEAP SUGGESTIONS ARE MADE OVER TOP OG SUGESTIONS
-        // (CHEAPER THAT DOING OVER ALL RETURNED CANDIDATES)
-        sugestions = sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions)
-
-        sugestions.forEach((s) => {
-
-            let test = s[0].slice(1);
-            //MAKING VRS BY DEL FIRST CHAR
-            !this.foundCache.has(test) && this.check(test) ?
-                sugestions.push([test, this.diffScoreStrings(ogWord, test)]) &
-                this.foundCache.add(test) : null
-
-
-            //MAKING VRS BY DEL LAST CHAR
-            test = s[0].slice(0, -1);
-            !this.foundCache.has(test) && this.check(test) ?
-                sugestions.push([test, this.diffScoreStrings(ogWord, test)]) &
-                this.foundCache.add(test) : null
-        })
-
-        sugestions = sugestions.sort((a, b) => b[1] - a[1])
-        return sugestions.map((s) => [this.addAccents(s[0]), s[1]]);
+        makeBonusesSuggestions();
+        sugestions = sugestions.map((s) => [this.addAccents(s[0]), s[1]]);
+        return sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
 
     }
 
