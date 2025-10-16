@@ -86,7 +86,7 @@ spell.correct(word, callback)
 * 2 - level tree LIKE dictionary index (`abu → (abue..a) → [pool] `) for fast lookups.
 * Typed arrays for fast edit-distance computation.
 * First call “warm-start” compiles hot paths for low latency later.
-* Avg suggestion look up is betwen 0.002 and 0.005 segs
+* Avg suggestion look up is betwen 0.0006 and 0.004 segs
 
 ---
 
