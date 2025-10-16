@@ -54,7 +54,7 @@ class coreMethods {
     maxNumSuggestions = 10;
 
     //  Warm-up run to avoid first-call latency
-    warmStart = false;
+    warmStart = true;
 
 
     //  Wildcard tokens used INSIDE candidate patterns:
@@ -911,7 +911,7 @@ class magikEspellCheck extends Syllabifier {
             let maxLen = rest.length + 2;
 
             patternsDone.add(st);
-            return [st + "[a-zñ]" + `{${minLn},${maxLen}}${altEnd(end)}`, [minLn, maxLen], end];
+            return [st + "[a-zñ]" + `{${minLn},${maxLen}}${altEnd(end)}`, [(minLn + 4), (maxLen + 4)], end];
         }
 
         let start = candidate.slice(0, 2);
@@ -933,6 +933,7 @@ class magikEspellCheck extends Syllabifier {
         posiblePatterns = [...posiblePatterns, ...candidateVrsV[0] ?? [], ...candidateVrsC[0] ?? []];
         // CLEANING
         posiblePatterns = posiblePatterns.filter((p) => !/[§|~]/.test(p));
+
 
         let validC = new Set();
         // FOR EACH POS CANDIDATE TESTING AND  REPAIRING WRONG STARs OR ENDs
@@ -996,8 +997,6 @@ class magikEspellCheck extends Syllabifier {
 
     returnSuggestions(patterns, ogWord) {
 
-        console.log(patterns);
-
         let sugestions = [];
         const sortAndCut = () => {
             return sugestions.sort((a, b) => b[1] - a[1]).slice(0, this.maxNumSuggestions);
@@ -1029,10 +1028,10 @@ class magikEspellCheck extends Syllabifier {
 
         }
 
-
         //
         // MAIN  SEARCH LOOP
         //
+
         patterns.some((_pattern) => {
 
             const [pattern, range, ending] = _pattern;
@@ -1043,22 +1042,23 @@ class magikEspellCheck extends Syllabifier {
 
             //Normal pool + words ending in vowel or consonants that have the pattern `ending` at.(-2)
             // (this amplifies the search range a lot without costing much effort)
-            let pool = set.get(`pool`)
+            let pool = set.get(`pool`);
+            let limits = set.get(`index`);
 
-            console.log(pool)
-            pool.forEach((w) => {
+            for (let i = limits.get(range[1]); i <= limits.get(range[0]); i++) {
+
+                const w = pool[i];
 
                 if (this.foundCache.has(w) || !reg.test(w))
-                    return;
+                    continue;
 
                 let score = this.diffScoreStrings(ogWord, w);
 
-                if (score < this.stringDiff) return;
+                if (score < this.stringDiff) continue;
 
                 this.foundCache.add(w);
                 sugestions.push([w, score]);
-
-            })
+            }
 
         })
 
