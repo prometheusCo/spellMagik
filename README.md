@@ -89,19 +89,6 @@ spell.correct(word, callback)
 
 ---
 
-## Licencia
-
-Licencia estilo MIT (ver cabecera del código fuente).  
-Gratis para uso personal, educativo y comercial — se requiere atribución.  
-No puede venderse como producto independiente de pago.
-
----
-
-## Autor
-
-**© 2025 José Alejandro Palomo González**  
-Diseñado para alta precisión, baja latencia y total compatibilidad con navegadores.
-
 #
 #
 
@@ -196,15 +183,5 @@ spell.correct(word, callback)
 
 ---
 
-## License
 
-MIT-style license (see source header).  
-Free for personal, educational, and commercial use — attribution required.  
-Cannot be sold as a standalone paid product.
 
----
-
-## Author
-
-**© 2025 José Alejandro Palomo González**  
-Designed for high accuracy, low latency, and full browser compatibility.
