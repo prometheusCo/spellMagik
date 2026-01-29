@@ -103,6 +103,7 @@ No puede venderse como producto independiente de pago.
 Diseñado para alta precisión, baja latencia y total compatibilidad con navegadores.
 
 #
+#
 
 ## magikEspellCheck
 
