@@ -102,11 +102,7 @@ No puede venderse como producto independiente de pago.
 **© 2025 José Alejandro Palomo González**  
 Diseñado para alta precisión, baja latencia y total compatibilidad con navegadores.
 
----
-
----
-
-# English Version
+#
 
 ## magikEspellCheck
 
@@ -131,6 +127,7 @@ It uses syllable-based heuristics and phonetic rules of Spanish to detect and fi
 ## Quick Use
 
 ```js
+
 const spell = new magikEspellCheck();
 
 // Will call your callback whether the word is correct or not
@@ -142,6 +139,7 @@ spell.correct("holla", suggestions => {
 const ok = spell.correct("hola", suggestions => {
   if (ok) console.log("Word is correct!");
 });
+
 ```
 
 ---
